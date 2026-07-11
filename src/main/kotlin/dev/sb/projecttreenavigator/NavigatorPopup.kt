@@ -126,8 +126,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.LEFT_UP) { moveLeft(-1) }
         commands.bind(NavigatorCommand.RIGHT_DOWN) { moveRight(1) }
         commands.bind(NavigatorCommand.RIGHT_UP) { moveRight(-1) }
-        commands.bindFixed("DOWN") { moveRight(1) }
-        commands.bindFixed("UP") { moveRight(-1) }
+        commands.bindFixed("DOWN") { moveActive(1) }
+        commands.bindFixed("UP") { moveActive(-1) }
         commands.bind(NavigatorCommand.PANE_RIGHT) { expandOrEnterRight() }
         commands.bind(NavigatorCommand.PANE_LEFT) { collapseOrExitLeft() }
         commands.bindFixed("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandOrEnterRight() }
@@ -406,6 +406,17 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun moveRight(delta: Int) {
         setActivePane(Pane.RIGHT)
         treePanel.move(delta)
+    }
+
+    private fun moveActive(delta: Int) {
+        when (activePane) {
+            Pane.LEFT -> {
+                rootList.move(delta)
+                rebuildRight()
+            }
+
+            Pane.RIGHT -> treePanel.move(delta)
+        }
     }
 
     private fun toggleDotFiles() {
