@@ -150,6 +150,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val resolved = ScopeResolver.resolve(scopes[scopeIndex], context)
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
+            generation++
             currentMatcher = null
             showBrowseTree(resolved)
             return
