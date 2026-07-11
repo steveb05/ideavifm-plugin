@@ -66,8 +66,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var pendingRestore: ZoomFrame? = null
     private var currentMatcher: MinusculeMatcher? = null
     private var autoExpandModule = false
-    private var filterBuckets: Map<BaseEntry, List<FileNameSearch.RankedFile>>? = null
-    private var namedBuckets: Map<BaseEntry, List<FileNameSearch.RankedFile>>? = null
+    private var filterMatches: List<FileNameSearch.RankedFile>? = null
+    private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private val fileNameSearch = FileNameSearch(project)
     private var alarm: Alarm? = null
 
@@ -218,17 +218,17 @@ class NavigatorPopup(private val context: NavigatorContext) {
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
             currentMatcher = null
-            filterBuckets = null
+            filterMatches = null
             if (scope is NavigatorScope.Named) {
                 showNamedScopeBrowse(scope, resolved)
             } else {
                 generation++
-                namedBuckets = null
+                namedMatches = null
                 showBrowse(resolved)
             }
             return
         }
-        namedBuckets = null
+        namedMatches = null
         runFilterSearch(query, resolved)
     }
 
@@ -284,18 +284,18 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun rebuildRight() {
         val entry = rootList.selectedEntry()
-        val filter = filterBuckets
-        val named = namedBuckets
+        val filter = filterMatches
+        val named = namedMatches
         when {
             filter != null -> {
-                treePanel.showPruned(entry?.let { filter[it] }.orEmpty(), entry?.file)
+                treePanel.showPruned(bucketFor(filter, entry), entry?.file)
                 treePanel.expandAll()
                 treePanel.setEmptyText("Nothing found")
                 treePanel.selectBestMatch()
             }
 
             named != null -> {
-                treePanel.showPruned(entry?.let { named[it] }.orEmpty(), entry?.file)
+                treePanel.showPruned(bucketFor(named, entry), entry?.file)
                 treePanel.expandTopLevel()
                 treePanel.setEmptyText("No files in scope")
                 context.currentFile?.let { treePanel.selectFile(it) }
@@ -313,6 +313,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         refreshPreview()
     }
+
+    private fun bucketFor(
+        matches: List<FileNameSearch.RankedFile>,
+        entry: BaseEntry?,
+    ): List<FileNameSearch.RankedFile> =
+        entry?.let { SubtreeMatches.matchesUnder(matches, it) { m -> m.file } }.orEmpty()
 
     private fun runFilterSearch(query: String, resolved: ScopeResolver.Resolved) {
         val activePopup = popup ?: return
@@ -336,10 +342,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { result ->
                 if (gen != generation) return@finishOnUiThread
                 currentMatcher = FileNameSearch.nameMatcher(query)
-                val buckets = EntryGrouping.group(result.files, entries) { it.file }
-                filterBuckets = buckets
+                filterMatches = result.files
                 rootList.setEntries(entries)
-                rootList.setCounts(buckets.mapValues { it.value.size })
+                rootList.setCounts(SubtreeMatches.countsFor(result.files, entries) { it.file })
                 val best = result.files.firstOrNull()
                 val bestEntry = best?.let { rootList.entryContaining(it.file) }
                 if (bestEntry != null) rootList.selectEntry(bestEntry)
@@ -370,9 +375,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
                     .filter { zoomed == null || VfsUtilCore.isAncestor(zoomed, it, false) }
                     .map { FileNameSearch.RankedFile(it, 0) }
                 val allEntries = effectiveEntries(resolved)
-                val buckets = EntryGrouping.group(files, allEntries) { it.file }
-                namedBuckets = buckets
-                val entries = allEntries.filter { buckets.getValue(it).isNotEmpty() }
+                namedMatches = files
+                val entries = allEntries.filter { SubtreeMatches.matchesUnder(files, it) { m -> m.file }.isNotEmpty() }
                 rootList.clearCounts()
                 rootList.setEntries(entries)
                 val current = context.currentFile?.takeIf { it.isValid }

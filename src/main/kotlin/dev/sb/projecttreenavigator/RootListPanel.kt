@@ -114,7 +114,8 @@ class RootListPanel(
     }
 
     fun entryContaining(file: VirtualFile): BaseEntry? =
-        entries().firstOrNull { VfsUtilCore.isAncestor(it.file, file, false) }
+        entries().filter { VfsUtilCore.isAncestor(it.file, file, false) }
+            .maxByOrNull { it.file.path.length }
 
     fun move(delta: Int) = selectIndex(list.selectedIndex + delta)
 

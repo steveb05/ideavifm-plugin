@@ -53,21 +53,14 @@ object PrunedTreeBuilder {
     }
 }
 
-object EntryGrouping {
+object SubtreeMatches {
 
-    fun <T> group(
+    fun <T> matchesUnder(items: List<T>, entry: BaseEntry, fileOf: (T) -> VirtualFile): List<T> =
+        items.filter { VfsUtilCore.isAncestor(entry.file, fileOf(it), false) }
+
+    fun <T> countsFor(
         items: List<T>,
         entries: List<BaseEntry>,
         fileOf: (T) -> VirtualFile,
-    ): LinkedHashMap<BaseEntry, List<T>> {
-        val buckets = LinkedHashMap<BaseEntry, MutableList<T>>()
-        for (entry in entries) buckets[entry] = mutableListOf()
-        for (item in items) {
-            val file = fileOf(item)
-            val entry = entries.firstOrNull { VfsUtilCore.isAncestor(it.file, file, false) } ?: continue
-            buckets.getValue(entry).add(item)
-        }
-        @Suppress("UNCHECKED_CAST")
-        return buckets as LinkedHashMap<BaseEntry, List<T>>
-    }
+    ): Map<BaseEntry, Int> = entries.associateWith { matchesUnder(items, it, fileOf).size }
 }

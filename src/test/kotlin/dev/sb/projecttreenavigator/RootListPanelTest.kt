@@ -31,6 +31,17 @@ class RootListPanelTest : BasePlatformTestCase() {
         assertNull(panel.entryContaining(myFixture.addFileToProject("c/z.txt", "").virtualFile))
     }
 
+    fun testEntryContainingPrefersDeepestEntry() {
+        val file = myFixture.addFileToProject("deep/sub/y.txt", "").virtualFile
+        val panel = RootListPanel(project, onUserSelection = { })
+        val entries = listOf(
+            BaseEntry(myFixture.findFileInTempDir("deep"), "deep", true),
+            BaseEntry(myFixture.findFileInTempDir("deep/sub"), "sub", true, indent = 1),
+        )
+        panel.setEntries(entries)
+        assertEquals(entries[1], panel.entryContaining(file))
+    }
+
     fun testSetEntriesKeepsModelWhenUnchanged() {
         val panel = RootListPanel(project, onUserSelection = { })
         myFixture.addFileToProject("a/x.txt", "")
