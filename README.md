@@ -2,11 +2,11 @@
 
 IntelliJ IDEA plugin: a keyboard driven two pane popup that shows the
 project file tree, filtered in place with Search Everywhere style
-matching. The left pane lists the top level entries of the active scope
-(so Gradle's nested `src/main` and `src/test` content roots never clutter
-the top level); the right pane shows the selected entry's subtree. Icons
-come from the IDE's icon providers, so icon packs such as Atom Material
-apply.
+matching, plus an optional ranger style preview pane. The left pane
+lists the top level entries of the active scope; the right pane shows
+the selected entry's subtree. Icons come from the IDE's icon providers,
+so icon packs such as Atom Material apply. Dot files are hidden and
+single child folder chains are compacted by default, both togglable.
 
 ## Usage
 
@@ -15,13 +15,29 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | Key | Action |
 | --- | --- |
 | type | Search the whole scope; the left pane shows per entry match counts, the right pane shows the selected entry's matches |
-| Up / Down, Ctrl+K / Ctrl+J | Move selection in the active pane; in the left pane the right pane refills live |
-| Left / Right (empty query), Ctrl+H / Ctrl+L | Collapse / expand in the right pane; at a top level row Ctrl+H moves to the left pane, Ctrl+L in the left pane moves back |
-| Enter | Open file, toggle folder, or enter the right pane from a left pane folder |
-| Ctrl+Enter | Zoom: the selected folder becomes the base of both panes |
-| Backspace (empty query) | Zoom out |
-| Tab / Shift+Tab | Cycle scope: Project, Module, Folder, custom scopes |
-| Esc | Close |
+| `Alt+J` / `Alt+K` | Move the left pane selection; the right pane refills live |
+| `Ctrl+J` / `Ctrl+K`, `Down` / `Up` | Move the right pane selection |
+| `Ctrl+H` (`Left` when query empty) | Collapse or walk to the parent; at a top level row, cross into the left pane |
+| `Ctrl+L` (`Right` when query empty) | Expand the folder; from the left pane, enter the right pane |
+| `Enter` | Open file, toggle folder, or enter the right pane from a left pane folder |
+| `Ctrl+Enter` | Zoom: the selected folder becomes the base of both panes |
+| `Backspace` (empty query) | Zoom out |
+| `Alt+P` | Toggle the preview pane |
+| `Ctrl+Period` | Toggle dot file hiding |
+| `Tab` / `Shift+Tab` | Cycle scope: Project, Module, Folder, custom scopes |
+| `Esc` | Close |
+
+Movement keys make their pane the active one; `Enter`, zoom and the
+preview follow the pane you last moved. The active pane carries a
+focus colored outline.
+
+## Settings
+
+Settings, Tools, Project Tree Navigator: hide dot files (default on),
+compact folder chains (default on), preview pane (default off). Every
+popup command above is remappable in Settings, Keymap under
+"Project Tree Navigator"; the defaults apply when no keymap shortcut
+is assigned.
 
 Custom scopes defined in Settings, Appearance and Behavior, Scopes appear
 as extra chips after Folder.
