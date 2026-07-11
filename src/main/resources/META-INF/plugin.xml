@@ -6,6 +6,12 @@
         Keyboard driven popup for navigating the project file tree with Search Everywhere style filtering, scope chips, and folder zoom.
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable parentId="tools"
+                                 instance="dev.sb.projecttreenavigator.NavigatorConfigurable"
+                                 id="dev.sb.projecttreenavigator.settings"
+                                 displayName="Project Tree Navigator"/>
+    </extensions>
     <actions>
         <action id="ProjectTreeNavigator.Show"
                 class="dev.sb.projecttreenavigator.ProjectTreeNavigatorAction"

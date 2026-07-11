@@ -1,0 +1,49 @@
+package dev.sb.projecttreenavigator
+
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.State
+import com.intellij.openapi.components.Storage
+
+@Service
+@State(name = "ProjectTreeNavigatorSettings", storages = [Storage("project-tree-navigator.xml")])
+class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
+
+    data class State(
+        var hideDotFiles: Boolean = true,
+        var compactFolders: Boolean = true,
+        var showPreview: Boolean = false,
+    )
+
+    private var current = State()
+
+    override fun getState(): State = current
+
+    override fun loadState(state: State) {
+        current = state
+    }
+
+    var hideDotFiles: Boolean
+        get() = current.hideDotFiles
+        set(value) {
+            current.hideDotFiles = value
+        }
+
+    var compactFolders: Boolean
+        get() = current.compactFolders
+        set(value) {
+            current.compactFolders = value
+        }
+
+    var showPreview: Boolean
+        get() = current.showPreview
+        set(value) {
+            current.showPreview = value
+        }
+
+    companion object {
+        fun getInstance(): NavigatorSettings =
+            ApplicationManager.getApplication().getService(NavigatorSettings::class.java)
+    }
+}
