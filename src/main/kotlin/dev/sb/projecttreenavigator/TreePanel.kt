@@ -51,6 +51,7 @@ class TreePanel(
         tree.isRootVisible = false
         tree.showsRootHandles = true
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
+        tree.toggleClickCount = 0
         tree.cellRenderer = NavigatorTreeCellRenderer(project, matcherProvider)
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
