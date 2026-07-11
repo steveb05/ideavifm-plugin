@@ -122,6 +122,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         registerKey("ENTER") { commitSelection() }
         registerKey("TAB") { cycleScope(1) }
         registerKey("shift TAB") { cycleScope(-1) }
+        registerKey("control ENTER", isEnabled = { selectedNode()?.let { nodeData(it)?.isDirectory == true && nodeData(it)?.file != null } == true }) { zoomIn() }
+        registerKey("BACK_SPACE", isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() }) { zoomOut() }
     }
 
     private fun registerKey(
@@ -150,6 +152,21 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun cycleScope(delta: Int) {
         scopeIndex = ((scopeIndex + delta) % scopes.size + scopes.size) % scopes.size
         zoomStack.clear()
+        refresh()
+    }
+
+    private fun zoomIn() {
+        val node = selectedNode() ?: return
+        val data = nodeData(node) ?: return
+        val dir = data.file ?: return
+        if (!data.isDirectory || !dir.isValid) return
+        zoomStack.addLast(dir)
+        refresh()
+    }
+
+    private fun zoomOut() {
+        if (zoomStack.isEmpty()) return
+        zoomStack.removeLast()
         refresh()
     }
 
