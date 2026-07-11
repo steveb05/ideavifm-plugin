@@ -95,4 +95,38 @@ class ScopeResolverTest : BasePlatformTestCase() {
         assertNotNull(hinted[1].parentHint)
         assertNull(hinted[2].parentHint)
     }
+
+    fun testAssembleProjectEntriesFlattensWhenNoOutsideRoots() {
+        myFixture.addFileToProject("base/a/x.txt", "")
+        val base = myFixture.findFileInTempDir("base")
+        val children = ScopeResolver.entriesForBase(project, base)
+        val entries = ScopeResolver.assembleProjectEntries(BaseEntry(base, base.name, true), children, emptyList())
+        assertEquals(children, entries)
+    }
+
+    fun testAssembleProjectEntriesShowsBaseBesideOutsideRootsSorted() {
+        myFixture.addFileToProject("extension/sub/x.txt", "")
+        myFixture.addFileToProject("engine/main/y.txt", "")
+        val extension = myFixture.findFileInTempDir("extension")
+        val engine = myFixture.findFileInTempDir("engine")
+        val entries = ScopeResolver.assembleProjectEntries(
+            BaseEntry(extension, extension.name, true),
+            ScopeResolver.entriesForBase(project, extension),
+            listOf(BaseEntry(engine, engine.name, true)),
+        )
+        assertEquals(listOf("engine", "extension"), entries.map { it.name })
+    }
+
+    fun testAssembleProjectEntriesWithNullBaseSortsOutsideRoots() {
+        myFixture.addFileToProject("zeta/x.txt", "")
+        myFixture.addFileToProject("alpha/y.txt", "")
+        val zeta = myFixture.findFileInTempDir("zeta")
+        val alpha = myFixture.findFileInTempDir("alpha")
+        val entries = ScopeResolver.assembleProjectEntries(
+            null,
+            emptyList(),
+            listOf(BaseEntry(zeta, zeta.name, true), BaseEntry(alpha, alpha.name, true)),
+        )
+        assertEquals(listOf("alpha", "zeta"), entries.map { it.name })
+    }
 }

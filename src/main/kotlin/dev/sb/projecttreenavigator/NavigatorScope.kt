@@ -92,6 +92,19 @@ object ScopeResolver {
         }
     }
 
+    fun assembleProjectEntries(
+        base: BaseEntry?,
+        baseChildren: List<BaseEntry>,
+        outside: List<BaseEntry>,
+    ): List<BaseEntry> = when {
+        base == null -> withParentHints(sortEntries(outside))
+        outside.isEmpty() -> withParentHints(baseChildren)
+        else -> withParentHints(sortEntries(listOf(base) + outside))
+    }
+
+    private fun sortEntries(entries: List<BaseEntry>): List<BaseEntry> =
+        entries.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+
     private fun customScopes(context: NavigatorContext): List<NamedScope> =
         NamedScopeManager.getInstance(context.project).editableScopes.toList() +
             DependencyValidationManager.getInstance(context.project).editableScopes.toList()
@@ -101,9 +114,11 @@ object ScopeResolver {
         val base = project.guessProjectDir()
         val contentRoots = ProjectRootManager.getInstance(project).contentRoots.toList()
         val outside = topLevelRoots(contentRoots, base).map { BaseEntry(it, it.name, it.isDirectory) }
-        val entries =
-            if (base == null) withParentHints(outside)
-            else withParentHints(entriesForBase(project, base) + outside)
+        val entries = assembleProjectEntries(
+            base?.let { BaseEntry(it, it.name, true) },
+            base?.let { entriesForBase(project, it) }.orEmpty(),
+            outside,
+        )
         return Resolved(entries, ProjectScope.getContentScope(project), false)
     }
 }
