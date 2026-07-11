@@ -50,4 +50,45 @@ class BrowseTreeTest : BasePlatformTestCase() {
         val deep = sub.firstChild as DefaultMutableTreeNode
         assertEquals("deep.txt", (deep.userObject as NavigatorNodeData).name)
     }
+
+    fun testVisibleChildrenHidesDotEntriesWhenEnabled() {
+        myFixture.addFileToProject("root/.idea/misc.xml", "")
+        myFixture.addFileToProject("root/.gitignore", "")
+        myFixture.addFileToProject("root/keep.txt", "")
+        val rootDir = myFixture.findFileInTempDir("root")
+        withDotFiles(hidden = true) {
+            assertEquals(listOf("keep.txt"), BrowseTree.visibleChildren(project, rootDir).map { it.name })
+        }
+        withDotFiles(hidden = false) {
+            assertEquals(
+                listOf(".idea", ".gitignore", "keep.txt"),
+                BrowseTree.visibleChildren(project, rootDir).map { it.name },
+            )
+        }
+    }
+
+    fun testHiddenByDotRuleChecksAncestors() {
+        myFixture.addFileToProject("root/.idea/misc.xml", "")
+        myFixture.addFileToProject("root/src/ok.txt", "")
+        val hidden = myFixture.findFileInTempDir("root/.idea/misc.xml")
+        val visible = myFixture.findFileInTempDir("root/src/ok.txt")
+        withDotFiles(hidden = true) {
+            assertTrue(BrowseTree.hiddenByDotRule(project, hidden))
+            assertFalse(BrowseTree.hiddenByDotRule(project, visible))
+        }
+        withDotFiles(hidden = false) {
+            assertFalse(BrowseTree.hiddenByDotRule(project, hidden))
+        }
+    }
+
+    private fun withDotFiles(hidden: Boolean, block: () -> Unit) {
+        val settings = NavigatorSettings.getInstance()
+        val before = settings.hideDotFiles
+        settings.hideDotFiles = hidden
+        try {
+            block()
+        } finally {
+            settings.hideDotFiles = before
+        }
+    }
 }

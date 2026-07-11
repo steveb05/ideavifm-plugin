@@ -272,7 +272,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
         ReadAction.nonBlocking<FileNameSearch.Result> {
-            fileNameSearch.search(query, searchScope)
+            val raw = fileNameSearch.search(query, searchScope)
+            FileNameSearch.Result(raw.files.filter { !BrowseTree.hiddenByDotRule(project, it.file) }, raw.truncated)
         }
             .coalesceBy(this)
             .expireWith(activePopup)
@@ -301,7 +302,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val gen = ++generation
         pendingRestore = null
         ReadAction.nonBlocking<NamedScopeFiles.Result> {
-            NamedScopeFiles.collect(project, named.namedScope)
+            val raw = NamedScopeFiles.collect(project, named.namedScope)
+            NamedScopeFiles.Result(raw.files.filter { !BrowseTree.hiddenByDotRule(project, it) }, raw.truncated)
         }
             .coalesceBy(this)
             .expireWith(activePopup)
