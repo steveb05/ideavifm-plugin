@@ -1,14 +1,26 @@
 package dev.sb.projecttreenavigator
 
+import com.intellij.ide.IdeView
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.LangDataKeys
+import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.GlobalSearchScopesCore
@@ -81,6 +93,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .setResizable(true)
             .setMovable(true)
             .setCancelOnClickOutside(true)
+            .setCancelOnWindowDeactivation(false)
             .setDimensionServiceKey(project, "dev.sb.projecttreenavigator.Popup", true)
             .createPopup()
         popup = created
@@ -142,6 +155,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         ) { zoomOut() }
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
+        commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
     }
 
     private fun scheduleRefresh() {
@@ -427,6 +441,59 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val settings = NavigatorSettings.getInstance()
         settings.hideDotFiles = !settings.hideDotFiles
         refresh()
+    }
+
+    private fun showNewElement() {
+        val dir = createTargetDirectory() ?: return
+        val psiDir = PsiManager.getInstance(project).findDirectory(dir) ?: return
+        val group = ActionManager.getInstance().getAction("NewGroup") as? ActionGroup ?: return
+        val dataContext = SimpleDataContext.builder()
+            .add(CommonDataKeys.PROJECT, project)
+            .add(PlatformCoreDataKeys.MODULE, ModuleUtilCore.findModuleForFile(dir, project))
+            .add(LangDataKeys.IDE_VIEW, PopupIdeView(psiDir))
+            .build()
+        JBPopupFactory.getInstance()
+            .createActionGroupPopup("New", group, dataContext, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, false)
+            .showInCenterOf(panel)
+    }
+
+    private fun createTargetDirectory(): VirtualFile? {
+        val selected =
+            if (activePane == Pane.LEFT) rootList.selectedEntry()?.file
+            else (treePanel.selectedFile() ?: rootList.selectedEntry()?.file)
+        val valid = selected?.takeIf { it.isValid } ?: return null
+        return if (valid.isDirectory) valid else valid.parent
+    }
+
+    private fun selectCreated(file: VirtualFile) {
+        if (searchField.text.isNotEmpty()) searchField.text = ""
+        refresh()
+        val entry = rootList.entryContaining(file) ?: return
+        rootList.selectEntry(entry)
+        rebuildRight()
+        if (entry.file == file) {
+            setActivePane(Pane.LEFT)
+        } else {
+            setActivePane(Pane.RIGHT)
+            treePanel.locate(file, entry.file)
+        }
+        refreshPreview()
+    }
+
+    private inner class PopupIdeView(private val dir: PsiDirectory) : IdeView {
+
+        override fun getDirectories(): Array<PsiDirectory> = arrayOf(dir)
+
+        override fun getOrChooseDirectory(): PsiDirectory? = dir
+
+        override fun selectElement(element: PsiElement) {
+            val file = when (element) {
+                is PsiFile -> element.virtualFile
+                is PsiDirectory -> element.virtualFile
+                else -> element.containingFile?.virtualFile
+            } ?: return
+            selectCreated(file)
+        }
     }
 
     private fun expandOrEnterRight() {

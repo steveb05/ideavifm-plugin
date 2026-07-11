@@ -61,6 +61,10 @@
                     text="Navigator: Toggle Dot Files" description="Show or hide dot files in the navigator">
                 <keyboard-shortcut keymap="$default" first-keystroke="control PERIOD"/>
             </action>
+            <action id="ProjectTreeNavigator.NewElement" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: New" description="Open the IDE New menu for the selected navigator folder">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt INSERT"/>
+            </action>
         </group>
     </actions>
 </idea-plugin>
