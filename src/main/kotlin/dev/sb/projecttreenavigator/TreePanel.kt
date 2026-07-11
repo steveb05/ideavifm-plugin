@@ -5,9 +5,11 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.ui.ClientProperty
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -19,6 +21,16 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 import javax.swing.tree.TreeSelectionModel
+
+object PaneBorders {
+    val focus: javax.swing.border.Border
+        get() = JBUI.Borders.customLine(
+            JBColor.namedColor("Component.focusColor", JBColor(0x87AFDA, 0x466D94)),
+            2,
+        )
+    val normal: javax.swing.border.Border
+        get() = JBUI.Borders.customLine(JBColor.border(), 2)
+}
 
 class TreePanel(
     private val project: Project,
@@ -68,6 +80,7 @@ class TreePanel(
 
     fun setActive(active: Boolean) {
         ClientProperty.put(tree, RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, active)
+        component.border = if (active) PaneBorders.focus else PaneBorders.normal
         tree.repaint()
     }
 

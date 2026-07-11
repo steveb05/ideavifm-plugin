@@ -122,20 +122,26 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun registerKeys() {
         val activePopup = popup ?: return
         val commands = NavigatorCommands(panel, activePopup)
-        commands.bind("DOWN") { moveSelection(1) }
-        commands.bind("control J") { moveSelection(1) }
-        commands.bind("UP") { moveSelection(-1) }
-        commands.bind("control K") { moveSelection(-1) }
-        commands.bind("control L") { expandOrEnterRight() }
-        commands.bind("control H") { collapseOrExitLeft() }
-        commands.bind("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandOrEnterRight() }
-        commands.bind("LEFT", isEnabled = { searchField.text.isEmpty() }) { collapseOrExitLeft() }
-        commands.bind("ENTER") { commitSelection() }
-        commands.bind("TAB") { cycleScope(1) }
-        commands.bind("shift TAB") { cycleScope(-1) }
-        commands.bind("control ENTER", isEnabled = { activeSelectedDirectory() != null }) { zoomIn() }
-        commands.bind("BACK_SPACE", isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() }) { zoomOut() }
-        commands.bind("alt P") { togglePreview() }
+        commands.bind(NavigatorCommand.LEFT_DOWN) { moveLeft(1) }
+        commands.bind(NavigatorCommand.LEFT_UP) { moveLeft(-1) }
+        commands.bind(NavigatorCommand.RIGHT_DOWN) { moveRight(1) }
+        commands.bind(NavigatorCommand.RIGHT_UP) { moveRight(-1) }
+        commands.bindFixed("DOWN") { moveRight(1) }
+        commands.bindFixed("UP") { moveRight(-1) }
+        commands.bind(NavigatorCommand.PANE_RIGHT) { expandOrEnterRight() }
+        commands.bind(NavigatorCommand.PANE_LEFT) { collapseOrExitLeft() }
+        commands.bindFixed("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandOrEnterRight() }
+        commands.bindFixed("LEFT", isEnabled = { searchField.text.isEmpty() }) { collapseOrExitLeft() }
+        commands.bindFixed("ENTER") { commitSelection() }
+        commands.bindFixed("TAB") { cycleScope(1) }
+        commands.bindFixed("shift TAB") { cycleScope(-1) }
+        commands.bind(NavigatorCommand.ZOOM_IN, isEnabled = { activeSelectedDirectory() != null }) { zoomIn() }
+        commands.bind(
+            NavigatorCommand.ZOOM_OUT,
+            isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() },
+        ) { zoomOut() }
+        commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
+        commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
     }
 
     private fun scheduleRefresh() {
@@ -391,13 +397,21 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun effectiveEntries(resolved: ScopeResolver.Resolved): List<BaseEntry> =
         zoomStack.lastOrNull()?.let { ScopeResolver.entriesForBase(project, it.dir) } ?: resolved.entries
 
-    private fun moveSelection(delta: Int) {
-        if (activePane == Pane.LEFT) {
-            rootList.move(delta)
-            rebuildRight()
-            return
-        }
+    private fun moveLeft(delta: Int) {
+        setActivePane(Pane.LEFT)
+        rootList.move(delta)
+        rebuildRight()
+    }
+
+    private fun moveRight(delta: Int) {
+        setActivePane(Pane.RIGHT)
         treePanel.move(delta)
+    }
+
+    private fun toggleDotFiles() {
+        val settings = NavigatorSettings.getInstance()
+        settings.hideDotFiles = !settings.hideDotFiles
+        refresh()
     }
 
     private fun expandOrEnterRight() {

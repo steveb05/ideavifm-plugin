@@ -66,6 +66,7 @@ class RootListPanel(
 
     fun setActive(active: Boolean) {
         ClientProperty.put(list, RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, active)
+        component.border = if (active) PaneBorders.focus else PaneBorders.normal
         list.repaint()
     }
 

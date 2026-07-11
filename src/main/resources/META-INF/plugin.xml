@@ -20,5 +20,27 @@
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt E"/>
             <add-to-group group-id="GoToMenu" anchor="last"/>
         </action>
+        <group id="ProjectTreeNavigator.Commands" text="Project Tree Navigator" popup="false">
+            <action id="ProjectTreeNavigator.LeftUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Left Pane Up" description="Move the left pane selection up in the navigator popup"/>
+            <action id="ProjectTreeNavigator.LeftDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Left Pane Down" description="Move the left pane selection down in the navigator popup"/>
+            <action id="ProjectTreeNavigator.RightUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Right Pane Up" description="Move the right pane selection up in the navigator popup"/>
+            <action id="ProjectTreeNavigator.RightDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Right Pane Down" description="Move the right pane selection down in the navigator popup"/>
+            <action id="ProjectTreeNavigator.PaneLeft" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Collapse or Exit Left" description="Collapse, walk to the parent, or cross into the left pane"/>
+            <action id="ProjectTreeNavigator.PaneRight" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Expand or Enter Right" description="Expand the folder or enter the right pane"/>
+            <action id="ProjectTreeNavigator.ZoomIn" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Zoom In" description="Make the selected folder the base of both panes"/>
+            <action id="ProjectTreeNavigator.ZoomOut" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Zoom Out" description="Pop the navigator zoom stack"/>
+            <action id="ProjectTreeNavigator.TogglePreview" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Toggle Preview" description="Show or hide the navigator preview pane"/>
+            <action id="ProjectTreeNavigator.ToggleDotFiles" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Toggle Dot Files" description="Show or hide dot files in the navigator"/>
+        </group>
     </actions>
 </idea-plugin>
