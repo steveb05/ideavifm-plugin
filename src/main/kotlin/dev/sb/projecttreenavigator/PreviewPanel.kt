@@ -18,6 +18,8 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
 import java.io.IOException
 import javax.swing.JComponent
+import javax.swing.JScrollBar
+import javax.swing.JScrollPane
 import javax.swing.SwingConstants
 
 class PreviewPanel(private val project: Project) {
@@ -32,6 +34,7 @@ class PreviewPanel(private val project: Project) {
     private val panel = BorderLayoutPanel()
     private val label = JBLabel("", SwingConstants.CENTER)
     private var editor: EditorEx? = null
+    private var scrollable: JScrollPane? = null
     private var popup: JBPopup? = null
     private var alarm: Alarm? = null
     private var generation = 0
@@ -41,6 +44,7 @@ class PreviewPanel(private val project: Project) {
 
     init {
         label.border = JBUI.Borders.empty(8)
+        panel.border = PaneBorders.normal
     }
 
     fun attach(popup: JBPopup) {
@@ -57,6 +61,34 @@ class PreviewPanel(private val project: Project) {
         activeAlarm.cancelAllRequests()
         activeAlarm.addRequest({ load(file) }, 150)
     }
+
+    fun setActive(active: Boolean) {
+        panel.border = if (active) PaneBorders.focus else PaneBorders.normal
+        panel.repaint()
+    }
+
+    fun scrollLines(delta: Int) {
+        val active = editor
+        if (active != null) {
+            val model = active.scrollingModel
+            model.scrollVertically((model.verticalScrollOffset + delta * active.lineHeight).coerceAtLeast(0))
+            return
+        }
+        scrollBar()?.let { it.value = it.value + delta * JBUI.scale(18) }
+    }
+
+    fun scrollHalfPage(delta: Int) {
+        val active = editor
+        if (active != null) {
+            val model = active.scrollingModel
+            val half = (model.visibleArea.height / 2).coerceAtLeast(active.lineHeight)
+            model.scrollVertically((model.verticalScrollOffset + delta * half).coerceAtLeast(0))
+            return
+        }
+        scrollBar()?.let { it.value = it.value + delta * (it.visibleAmount / 2).coerceAtLeast(JBUI.scale(18)) }
+    }
+
+    private fun scrollBar(): JScrollBar? = scrollable?.verticalScrollBar
 
     private fun load(file: VirtualFile?) {
         val activePopup = popup ?: return
@@ -78,6 +110,7 @@ class PreviewPanel(private val project: Project) {
     private fun apply(content: Content, file: VirtualFile) {
         releaseEditor()
         panel.removeAll()
+        scrollable = null
         when (content) {
             is Content.Text -> {
                 val factory = EditorFactory.getInstance()
@@ -96,6 +129,7 @@ class PreviewPanel(private val project: Project) {
                 }
                 editor = created
                 panel.addToCenter(created.component)
+                scrollable = created.scrollPane
                 if (content.truncated) {
                     val note = JBLabel("Preview truncated")
                     note.border = JBUI.Borders.empty(2, 8)
@@ -115,7 +149,9 @@ class PreviewPanel(private val project: Project) {
                 val listing = JBLabel("<html>$names$suffix</html>", SwingConstants.LEFT)
                 listing.verticalAlignment = SwingConstants.TOP
                 listing.border = JBUI.Borders.empty(8)
-                panel.addToCenter(JBScrollPane(listing))
+                val pane = JBScrollPane(listing)
+                scrollable = pane
+                panel.addToCenter(pane)
             }
 
             Content.Empty -> showCentered("No preview")
@@ -127,6 +163,7 @@ class PreviewPanel(private val project: Project) {
     private fun showLabel(text: String) {
         releaseEditor()
         panel.removeAll()
+        scrollable = null
         showCentered(text)
         panel.revalidate()
         panel.repaint()

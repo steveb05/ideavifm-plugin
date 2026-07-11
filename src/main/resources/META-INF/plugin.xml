@@ -65,6 +65,22 @@
                     text="Navigator: New" description="Open the IDE New menu for the selected navigator folder">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt INSERT"/>
             </action>
+            <action id="ProjectTreeNavigator.PreviewLineDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Preview Line Down" description="Scroll the navigator preview down one line">
+                <keyboard-shortcut keymap="$default" first-keystroke="control E"/>
+            </action>
+            <action id="ProjectTreeNavigator.PreviewLineUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Preview Line Up" description="Scroll the navigator preview up one line">
+                <keyboard-shortcut keymap="$default" first-keystroke="control Y"/>
+            </action>
+            <action id="ProjectTreeNavigator.PreviewHalfDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Preview Half Page Down" description="Scroll the navigator preview down half a page">
+                <keyboard-shortcut keymap="$default" first-keystroke="control D"/>
+            </action>
+            <action id="ProjectTreeNavigator.PreviewHalfUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Preview Half Page Up" description="Scroll the navigator preview up half a page">
+                <keyboard-shortcut keymap="$default" first-keystroke="control U"/>
+            </action>
         </group>
     </actions>
 </idea-plugin>

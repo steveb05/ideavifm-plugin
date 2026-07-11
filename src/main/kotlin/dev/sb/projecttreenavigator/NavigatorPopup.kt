@@ -38,7 +38,7 @@ import javax.swing.event.DocumentEvent
 
 class NavigatorPopup(private val context: NavigatorContext) {
 
-    private enum class Pane { LEFT, RIGHT }
+    private enum class Pane { LEFT, RIGHT, PREVIEW }
 
     private class ZoomFrame(
         val dir: VirtualFile,
@@ -156,6 +156,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
+        commands.bind(NavigatorCommand.PREVIEW_LINE_DOWN, isEnabled = { previewVisible() }) { previewPanel.scrollLines(1) }
+        commands.bind(NavigatorCommand.PREVIEW_LINE_UP, isEnabled = { previewVisible() }) { previewPanel.scrollLines(-1) }
+        commands.bind(NavigatorCommand.PREVIEW_HALF_DOWN, isEnabled = { previewVisible() }) { previewPanel.scrollHalfPage(1) }
+        commands.bind(NavigatorCommand.PREVIEW_HALF_UP, isEnabled = { previewVisible() }) { previewPanel.scrollHalfPage(-1) }
     }
 
     private fun scheduleRefresh() {
@@ -176,6 +180,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         activePane = pane
         treePanel.setActive(pane == Pane.RIGHT)
         rootList.setActive(pane == Pane.LEFT)
+        previewPanel.setActive(pane == Pane.PREVIEW)
         refreshPreview()
     }
 
@@ -195,6 +200,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val file = when (activePane) {
             Pane.LEFT -> rootList.selectedEntry()?.file
             Pane.RIGHT -> treePanel.selectedFile()
+            Pane.PREVIEW -> treePanel.selectedFile()
         }
         previewPanel.setTarget(file)
     }
@@ -207,9 +213,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun togglePreview() {
         val settings = NavigatorSettings.getInstance()
         settings.showPreview = !settings.showPreview
+        if (!settings.showPreview && activePane == Pane.PREVIEW) setActivePane(Pane.RIGHT)
         applyPreviewVisibility()
         refreshPreview()
     }
+
+    private fun previewVisible(): Boolean = NavigatorSettings.getInstance().showPreview
 
     private fun zoomIn() {
         val dir = activeSelectedDirectory() ?: return
@@ -434,6 +443,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
             }
 
             Pane.RIGHT -> treePanel.move(delta)
+
+            Pane.PREVIEW -> previewPanel.scrollLines(delta)
         }
     }
 
@@ -497,11 +508,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun expandOrEnterRight() {
-        if (activePane == Pane.LEFT) {
-            enterRightPane()
-            return
+        when (activePane) {
+            Pane.LEFT -> enterRightPane()
+            Pane.PREVIEW -> Unit
+            Pane.RIGHT -> {
+                val data = treePanel.selectedData()
+                if (data != null && !data.isDirectory && previewVisible()) setActivePane(Pane.PREVIEW)
+                else treePanel.expandSelection()
+            }
         }
-        treePanel.expandSelection()
     }
 
     private fun enterRightPane() {
@@ -512,9 +527,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun collapseOrExitLeft() {
-        if (activePane == Pane.LEFT) return
-        if (treePanel.collapseSelection() == TreePanel.CollapseOutcome.AT_TOP_LEVEL) {
-            setActivePane(Pane.LEFT)
+        when (activePane) {
+            Pane.LEFT -> Unit
+            Pane.PREVIEW -> setActivePane(Pane.RIGHT)
+            Pane.RIGHT -> {
+                if (treePanel.collapseSelection() == TreePanel.CollapseOutcome.AT_TOP_LEVEL) {
+                    setActivePane(Pane.LEFT)
+                }
+            }
         }
     }
 
@@ -556,6 +576,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
             ?.takeIf { it.isValid }
 
         Pane.RIGHT -> treePanel.selectedDirectory()
+
+        Pane.PREVIEW -> treePanel.selectedDirectory()
     }
 
     private fun updateScopeLabel(resolved: ScopeResolver.Resolved) {

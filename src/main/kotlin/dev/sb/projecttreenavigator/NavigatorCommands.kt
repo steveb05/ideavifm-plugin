@@ -22,6 +22,10 @@ enum class NavigatorCommand(val actionId: String) {
     TOGGLE_PREVIEW("ProjectTreeNavigator.TogglePreview"),
     TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles"),
     NEW_ELEMENT("ProjectTreeNavigator.NewElement"),
+    PREVIEW_LINE_DOWN("ProjectTreeNavigator.PreviewLineDown"),
+    PREVIEW_LINE_UP("ProjectTreeNavigator.PreviewLineUp"),
+    PREVIEW_HALF_DOWN("ProjectTreeNavigator.PreviewHalfDown"),
+    PREVIEW_HALF_UP("ProjectTreeNavigator.PreviewHalfUp"),
     ;
 
     fun shortcutSet(): CustomShortcutSet =
