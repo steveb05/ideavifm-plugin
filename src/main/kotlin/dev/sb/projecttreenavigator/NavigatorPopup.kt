@@ -1,12 +1,8 @@
 package dev.sb.projecttreenavigator
 
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.CustomShortcutSet
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -16,30 +12,17 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.GlobalSearchScopesCore
-import com.intellij.ui.ClientProperty
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.render.RenderingUtil
-import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.Alarm
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
-import com.intellij.util.ui.tree.TreeUtil
 import java.awt.Dimension
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import javax.swing.Box
 import javax.swing.event.DocumentEvent
-import javax.swing.event.TreeExpansionEvent
-import javax.swing.event.TreeWillExpandListener
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.TreePath
-import javax.swing.tree.TreeSelectionModel
 
 class NavigatorPopup(private val context: NavigatorContext) {
 
@@ -60,7 +43,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private val searchField = SearchTextField(false)
     private val scopeLabel = JBLabel()
     private val footerLabel = JBLabel()
-    private val tree = Tree()
+    private val treePanel = TreePanel(
+        project,
+        { currentMatcher },
+        onActivate = { setActivePane(Pane.RIGHT) },
+        onCommit = { commitSelection() },
+    )
     private val rootList = RootListPanel(project) { onUserListSelection() }
     private val panel = BorderLayoutPanel()
 
@@ -99,25 +87,6 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun buildPanel() {
-        tree.isRootVisible = false
-        tree.showsRootHandles = true
-        tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
-        tree.cellRenderer = NavigatorTreeCellRenderer(project) { currentMatcher }
-        tree.addTreeWillExpandListener(object : TreeWillExpandListener {
-            override fun treeWillExpand(event: TreeExpansionEvent) {
-                val node = event.path.lastPathComponent as DefaultMutableTreeNode
-                BrowseTree.loadChildren(project, tree.model as DefaultTreeModel, node)
-            }
-
-            override fun treeWillCollapse(event: TreeExpansionEvent) = Unit
-        })
-        tree.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                setActivePane(Pane.RIGHT)
-                if (e.clickCount == 2) commitSelection()
-            }
-        })
-
         footerLabel.isVisible = false
         scopeLabel.border = JBUI.Borders.empty(4, 6, 0, 6)
         footerLabel.border = JBUI.Borders.empty(2, 6, 4, 6)
@@ -127,7 +96,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         header.add(searchField)
         val splitter = OnePixelSplitter(false, "dev.sb.projecttreenavigator.Splitter", 0.25f)
         splitter.firstComponent = rootList.component
-        splitter.secondComponent = JBScrollPane(tree)
+        splitter.secondComponent = treePanel.component
         panel.addToTop(header)
         panel.addToCenter(splitter)
         panel.addToBottom(footerLabel)
@@ -137,36 +106,21 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun registerKeys() {
-        registerKey("DOWN") { moveSelection(1) }
-        registerKey("control J") { moveSelection(1) }
-        registerKey("UP") { moveSelection(-1) }
-        registerKey("control K") { moveSelection(-1) }
-        registerKey("control L") { expandOrEnterRight() }
-        registerKey("control H") { collapseOrExitLeft() }
-        registerKey("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandOrEnterRight() }
-        registerKey("LEFT", isEnabled = { searchField.text.isEmpty() }) { collapseOrExitLeft() }
-        registerKey("ENTER") { commitSelection() }
-        registerKey("TAB") { cycleScope(1) }
-        registerKey("shift TAB") { cycleScope(-1) }
-        registerKey("control ENTER", isEnabled = { activeSelectedDirectory() != null }) { zoomIn() }
-        registerKey("BACK_SPACE", isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() }) { zoomOut() }
-    }
-
-    private fun registerKey(
-        shortcut: String,
-        isEnabled: () -> Boolean = { true },
-        perform: () -> Unit,
-    ) {
         val activePopup = popup ?: return
-        val action = object : DumbAwareAction() {
-            override fun actionPerformed(e: AnActionEvent) = perform()
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = isEnabled()
-            }
-
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        }
-        action.registerCustomShortcutSet(CustomShortcutSet.fromString(shortcut), panel, activePopup)
+        val commands = NavigatorCommands(panel, activePopup)
+        commands.bind("DOWN") { moveSelection(1) }
+        commands.bind("control J") { moveSelection(1) }
+        commands.bind("UP") { moveSelection(-1) }
+        commands.bind("control K") { moveSelection(-1) }
+        commands.bind("control L") { expandOrEnterRight() }
+        commands.bind("control H") { collapseOrExitLeft() }
+        commands.bind("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandOrEnterRight() }
+        commands.bind("LEFT", isEnabled = { searchField.text.isEmpty() }) { collapseOrExitLeft() }
+        commands.bind("ENTER") { commitSelection() }
+        commands.bind("TAB") { cycleScope(1) }
+        commands.bind("shift TAB") { cycleScope(-1) }
+        commands.bind("control ENTER", isEnabled = { activeSelectedDirectory() != null }) { zoomIn() }
+        commands.bind("BACK_SPACE", isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() }) { zoomOut() }
     }
 
     private fun scheduleRefresh() {
@@ -185,9 +139,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun setActivePane(pane: Pane) {
         activePane = pane
-        ClientProperty.put(tree, RenderingUtil.ALWAYS_PAINT_SELECTION_AS_FOCUSED, pane == Pane.RIGHT)
+        treePanel.setActive(pane == Pane.RIGHT)
         rootList.setActive(pane == Pane.LEFT)
-        tree.repaint()
     }
 
     private fun onUserListSelection() {
@@ -197,7 +150,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun zoomIn() {
         val dir = activeSelectedDirectory() ?: return
-        zoomStack.addLast(ZoomFrame(dir, rootList.selectedIndex(), rightSelectedFile(), activePane))
+        zoomStack.addLast(ZoomFrame(dir, rootList.selectedIndex(), treePanel.selectedFile(), activePane))
         setActivePane(Pane.LEFT)
         refresh()
     }
@@ -232,7 +185,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun showBrowse(resolved: ScopeResolver.Resolved) {
         rootList.clearCounts()
         setFooter(null)
-        tree.emptyText.text = "No files in scope"
+        treePanel.setEmptyText("No files in scope")
         val entries = effectiveEntries(resolved)
         val previous = rootList.selectedEntry()
         rootList.setEntries(entries)
@@ -254,7 +207,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 when {
                     containing == null -> Unit
                     containing.file == current -> setActivePane(Pane.LEFT)
-                    else -> locateInSubtree(current, containing.file)
+                    else -> treePanel.locate(current, containing.file)
                 }
             }
 
@@ -276,7 +229,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val entry = rootList.selectedEntry() ?: return
         val target = frame.rightFile ?: return
         if (!target.isValid || !VfsUtilCore.isAncestor(entry.file, target, true)) return
-        locateInSubtree(target, entry.file)
+        treePanel.locate(target, entry.file)
     }
 
     private fun rebuildRight() {
@@ -285,25 +238,22 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val named = namedBuckets
         when {
             filter != null -> {
-                setPrunedModel(entry?.let { filter[it] }.orEmpty(), entry?.file)
-                TreeUtil.expandAll(tree)
-                tree.emptyText.text = "Nothing found"
-                selectBestMatch()
+                treePanel.showPruned(entry?.let { filter[it] }.orEmpty(), entry?.file)
+                treePanel.expandAll()
+                treePanel.setEmptyText("Nothing found")
+                treePanel.selectBestMatch()
             }
 
             named != null -> {
-                setPrunedModel(entry?.let { named[it] }.orEmpty(), entry?.file)
-                TreeUtil.expand(tree, 1)
-                tree.emptyText.text = "No files in scope"
-                context.currentFile?.let { selectFileNode(it) }
+                treePanel.showPruned(entry?.let { named[it] }.orEmpty(), entry?.file)
+                treePanel.expandTopLevel()
+                treePanel.setEmptyText("No files in scope")
+                context.currentFile?.let { treePanel.selectFile(it) }
             }
 
             else -> {
                 val dir = entry?.file?.takeIf { entry.isDirectory && it.isValid }
-                tree.model =
-                    if (dir == null) DefaultTreeModel(DefaultMutableTreeNode(NavigatorNodeData(null, "", true)))
-                    else BrowseTree.createSubtreeModel(project, dir)
-                if (tree.rowCount > 0) tree.setSelectionRow(0)
+                if (dir == null) treePanel.showEmpty() else treePanel.showSubtree(dir)
             }
         }
     }
@@ -389,93 +339,13 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun effectiveEntries(resolved: ScopeResolver.Resolved): List<BaseEntry> =
         zoomStack.lastOrNull()?.let { ScopeResolver.entriesForBase(project, it.dir) } ?: resolved.entries
 
-    private fun setPrunedModel(ranked: List<FileNameSearch.RankedFile>, base: VirtualFile?) {
-        val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base?.name.orEmpty(), true))
-        if (base != null) {
-            val prunedMatches = ranked.mapNotNull { m ->
-                val relative = VfsUtilCore.getRelativePath(m.file, base) ?: return@mapNotNull null
-                if (relative.isEmpty()) return@mapNotNull null
-                PrunedMatch(relative.split('/'), m.file, m.weight)
-            }
-            appendPruned(hiddenRoot, PrunedTreeBuilder.build(prunedMatches))
-        }
-        tree.model = DefaultTreeModel(hiddenRoot)
-    }
-
-    private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<VirtualFile>>) {
-        val parentFile = (parent.userObject as NavigatorNodeData).file
-        for (n in nodes) {
-            val file = n.payload ?: parentFile?.findChild(n.name)
-            val child = DefaultMutableTreeNode(
-                NavigatorNodeData(file, n.name, n.payload == null, n.weight),
-            )
-            parent.add(child)
-            if (n.payload == null) appendPruned(child, n.children)
-        }
-    }
-
-    private fun selectBestMatch() {
-        val hiddenRoot = (tree.model as DefaultTreeModel).root as DefaultMutableTreeNode
-        var best: DefaultMutableTreeNode? = null
-        var bestWeight = Int.MIN_VALUE
-        val enumeration = hiddenRoot.depthFirstEnumeration()
-        while (enumeration.hasMoreElements()) {
-            val node = enumeration.nextElement() as DefaultMutableTreeNode
-            val data = nodeData(node) ?: continue
-            if (!data.isDirectory && data.weight > bestWeight) {
-                best = node
-                bestWeight = data.weight
-            }
-        }
-        val target = best ?: return
-        val path = TreePath(target.path)
-        tree.selectionPath = path
-        tree.scrollPathToVisible(path)
-    }
-
-    private fun selectFileNode(file: VirtualFile) {
-        val hiddenRoot = (tree.model as DefaultTreeModel).root as DefaultMutableTreeNode
-        val enumeration = hiddenRoot.depthFirstEnumeration()
-        while (enumeration.hasMoreElements()) {
-            val node = enumeration.nextElement() as DefaultMutableTreeNode
-            if (nodeData(node)?.file == file) {
-                val path = TreePath(node.path)
-                tree.selectionPath = path
-                tree.scrollPathToVisible(path)
-                return
-            }
-        }
-    }
-
-    private fun locateInSubtree(file: VirtualFile, base: VirtualFile) {
-        val model = tree.model as DefaultTreeModel
-        var node = model.root as DefaultMutableTreeNode
-        val relative = VfsUtilCore.getRelativePath(file, base) ?: return
-        if (relative.isEmpty()) return
-        for (segment in relative.split('/')) {
-            BrowseTree.loadChildren(project, model, node)
-            node = node.children().asSequence()
-                .filterIsInstance<DefaultMutableTreeNode>()
-                .firstOrNull { nodeData(it)?.name == segment } ?: return
-        }
-        val path = TreePath(node.path)
-        path.parentPath?.let { tree.expandPath(it) }
-        tree.selectionPath = path
-        tree.scrollPathToVisible(path)
-    }
-
     private fun moveSelection(delta: Int) {
         if (activePane == Pane.LEFT) {
             rootList.move(delta)
             rebuildRight()
             return
         }
-        val rowCount = tree.rowCount
-        if (rowCount == 0) return
-        val current = tree.selectionRows?.firstOrNull() ?: -1
-        val next = (current + delta).coerceIn(0, rowCount - 1)
-        tree.setSelectionRow(next)
-        tree.scrollRowToVisible(next)
+        treePanel.move(delta)
     }
 
     private fun expandOrEnterRight() {
@@ -483,39 +353,21 @@ class NavigatorPopup(private val context: NavigatorContext) {
             enterRightPane()
             return
         }
-        val path = tree.selectionPath ?: return
-        val node = path.lastPathComponent as DefaultMutableTreeNode
-        if (nodeData(node)?.isDirectory != true) return
-        BrowseTree.loadChildren(project, tree.model as DefaultTreeModel, node)
-        tree.expandPath(path)
+        treePanel.expandSelection()
     }
 
     private fun enterRightPane() {
         val entry = rootList.selectedEntry() ?: return
         if (!entry.isDirectory) return
         setActivePane(Pane.RIGHT)
-        if (tree.selectionPath == null && tree.rowCount > 0) tree.setSelectionRow(0)
+        treePanel.selectFirstRowIfNone()
     }
 
     private fun collapseOrExitLeft() {
         if (activePane == Pane.LEFT) return
-        val path = tree.selectionPath
-        if (path == null) {
+        if (treePanel.collapseSelection() == TreePanel.CollapseOutcome.AT_TOP_LEVEL) {
             setActivePane(Pane.LEFT)
-            return
         }
-        if (tree.isExpanded(path)) {
-            tree.collapsePath(path)
-            return
-        }
-        val parent = path.parentPath
-        val parentNode = parent?.lastPathComponent as? DefaultMutableTreeNode
-        if (parentNode?.parent == null) {
-            setActivePane(Pane.LEFT)
-            return
-        }
-        tree.selectionPath = parent
-        tree.scrollPathToVisible(parent)
     }
 
     private fun commitSelection() {
@@ -534,17 +386,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
             FileEditorManager.getInstance(project).openFile(entry.file, true)
             return
         }
-        val path = tree.selectionPath ?: return
-        val node = path.lastPathComponent as DefaultMutableTreeNode
-        val data = nodeData(node) ?: return
+        val data = treePanel.selectedData() ?: return
         if (data.isDirectory) {
-            if (tree.isExpanded(path)) tree.collapsePath(path) else expandOrEnterRight()
+            if (treePanel.isSelectionExpanded()) treePanel.collapseSelectionPath() else expandOrEnterRight()
             return
         }
         val file = data.file ?: return
         if (!file.isValid) {
             setFooter("File no longer exists")
-            (tree.model as DefaultTreeModel).removeNodeFromParent(node)
+            treePanel.removeSelectedNode()
             return
         }
         popup?.closeOk(null)
@@ -557,20 +407,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
             ?.file
             ?.takeIf { it.isValid }
 
-        Pane.RIGHT -> selectedNode()
-            ?.let { nodeData(it) }
-            ?.takeIf { it.isDirectory }
-            ?.file
-            ?.takeIf { it.isValid }
+        Pane.RIGHT -> treePanel.selectedDirectory()
     }
-
-    private fun rightSelectedFile(): VirtualFile? = selectedNode()?.let { nodeData(it) }?.file
-
-    private fun selectedNode(): DefaultMutableTreeNode? =
-        tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
-
-    private fun nodeData(node: DefaultMutableTreeNode): NavigatorNodeData? =
-        node.userObject as? NavigatorNodeData
 
     private fun updateScopeLabel(resolved: ScopeResolver.Resolved) {
         val chips = scopes.mapIndexed { i, s ->
