@@ -6,4 +6,13 @@
         Keyboard driven popup for navigating the project file tree with Search Everywhere style filtering, scope chips, and folder zoom.
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
+    <actions>
+        <action id="ProjectTreeNavigator.Show"
+                class="dev.sb.projecttreenavigator.ProjectTreeNavigatorAction"
+                text="Project Tree Navigator"
+                description="Open the project tree navigator popup">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt E"/>
+            <add-to-group group-id="GoToMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
