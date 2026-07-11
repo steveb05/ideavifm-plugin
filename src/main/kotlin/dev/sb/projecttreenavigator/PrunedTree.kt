@@ -1,5 +1,8 @@
 package dev.sb.projecttreenavigator
 
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
+
 data class PrunedMatch<T>(val segments: List<String>, val payload: T, val weight: Int)
 
 class PrunedTreeNode<T>(
@@ -35,5 +38,24 @@ object PrunedTreeBuilder {
             .sortedBy { it.name.lowercase() }
         val files = node.files.sortedBy { it.name.lowercase() }
         return folders + files
+    }
+}
+
+object EntryGrouping {
+
+    fun <T> group(
+        items: List<T>,
+        entries: List<BaseEntry>,
+        fileOf: (T) -> VirtualFile,
+    ): LinkedHashMap<BaseEntry, List<T>> {
+        val buckets = LinkedHashMap<BaseEntry, MutableList<T>>()
+        for (entry in entries) buckets[entry] = mutableListOf()
+        for (item in items) {
+            val file = fileOf(item)
+            val entry = entries.firstOrNull { VfsUtilCore.isAncestor(it.file, file, false) } ?: continue
+            buckets.getValue(entry).add(item)
+        }
+        @Suppress("UNCHECKED_CAST")
+        return buckets as LinkedHashMap<BaseEntry, List<T>>
     }
 }
