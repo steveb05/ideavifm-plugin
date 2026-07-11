@@ -58,6 +58,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var firstOpen = true
     private var pendingRestore: ZoomFrame? = null
     private var currentMatcher: MinusculeMatcher? = null
+    private var autoExpandModule = false
     private var filterBuckets: Map<BaseEntry, List<FileNameSearch.RankedFile>>? = null
     private var namedBuckets: Map<BaseEntry, List<FileNameSearch.RankedFile>>? = null
     private val fileNameSearch = FileNameSearch(project)
@@ -165,6 +166,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val query = searchField.text.trim()
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
+        autoExpandModule = scope == NavigatorScope.Module && !resolved.fellBack && query.isEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
             currentMatcher = null
@@ -253,7 +255,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
             else -> {
                 val dir = entry?.file?.takeIf { entry.isDirectory && it.isValid }
-                if (dir == null) treePanel.showEmpty() else treePanel.showSubtree(dir)
+                if (dir == null) {
+                    treePanel.showEmpty()
+                } else {
+                    treePanel.showSubtree(dir)
+                    if (autoExpandModule) treePanel.expandToFirstFileLevel()
+                }
             }
         }
     }

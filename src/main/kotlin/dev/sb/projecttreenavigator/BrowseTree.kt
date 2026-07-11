@@ -81,6 +81,31 @@ object BrowseTree {
         return deepest to names.toString()
     }
 
+    fun autoExpandTargets(
+        project: Project,
+        model: DefaultTreeModel,
+        maxDepth: Int = 8,
+        maxNodes: Int = 200,
+    ): List<DefaultMutableTreeNode> {
+        val targets = ArrayList<DefaultMutableTreeNode>()
+        var level = listOf(model.root as DefaultMutableTreeNode)
+        for (depth in 0 until maxDepth) {
+            val next = ArrayList<DefaultMutableTreeNode>()
+            var hasFile = false
+            for (node in level) {
+                loadChildren(project, model, node)
+                for (child in node.children().asSequence().filterIsInstance<DefaultMutableTreeNode>()) {
+                    val data = child.userObject as? NavigatorNodeData ?: continue
+                    if (data.isDirectory) next.add(child) else hasFile = true
+                }
+            }
+            if (hasFile || next.isEmpty() || targets.size + next.size > maxNodes) return targets
+            targets.addAll(next)
+            level = next
+        }
+        return targets
+    }
+
     private fun directoryNode(project: Project, dir: VirtualFile): DefaultMutableTreeNode {
         val (deepest, name) = compactChain(project, dir)
         val node = DefaultMutableTreeNode(NavigatorNodeData(deepest, name, true))

@@ -88,6 +88,12 @@ class TreePanel(
         tree.model = DefaultTreeModel(hiddenRoot)
     }
 
+    fun expandToFirstFileLevel() {
+        for (node in BrowseTree.autoExpandTargets(project, model())) {
+            tree.expandPath(TreePath(node.path))
+        }
+    }
+
     fun expandAll() = TreeUtil.expandAll(tree)
 
     fun expandTopLevel() = TreeUtil.expand(tree, 1)

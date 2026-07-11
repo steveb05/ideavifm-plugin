@@ -121,6 +121,27 @@ class BrowseTreeTest : BasePlatformTestCase() {
         }
     }
 
+    fun testAutoExpandTargetsStopAtFirstFileLevel() {
+        myFixture.addFileToProject("root/x/one/inner.txt", "")
+        myFixture.addFileToProject("root/y/two.txt", "")
+        val rootDir = myFixture.findFileInTempDir("root")
+        withCompact(enabled = false) {
+            val model = BrowseTree.createSubtreeModel(project, rootDir)
+            val targets = BrowseTree.autoExpandTargets(project, model)
+            assertEquals(listOf("x", "y"), targets.map { (it.userObject as NavigatorNodeData).name })
+        }
+    }
+
+    fun testAutoExpandTargetsEmptyWhenRootLevelHasFiles() {
+        myFixture.addFileToProject("root/a/inner.txt", "")
+        myFixture.addFileToProject("root/top.txt", "")
+        val rootDir = myFixture.findFileInTempDir("root")
+        withCompact(enabled = false) {
+            val model = BrowseTree.createSubtreeModel(project, rootDir)
+            assertTrue(BrowseTree.autoExpandTargets(project, model).isEmpty())
+        }
+    }
+
     private fun childNames(node: DefaultMutableTreeNode): List<String> =
         node.children().asSequence()
             .filterIsInstance<DefaultMutableTreeNode>()
