@@ -25,6 +25,7 @@ data class BaseEntry(
     val name: String,
     val isDirectory: Boolean,
     val parentHint: String? = null,
+    val indent: Int = 0,
 )
 
 object ScopeResolver {
@@ -53,7 +54,7 @@ object ScopeResolver {
                     false,
                 )
                 else -> Resolved(
-                    withParentHints(roots.map { entryFor(context.project, it) }),
+                    withChildEntries(context.project, withParentHints(roots.map { entryFor(context.project, it) })),
                     module.moduleContentScope,
                     false,
                 )
@@ -110,6 +111,23 @@ object ScopeResolver {
         else -> withParentHints(sortEntries(listOf(base) + outside))
     }
 
+    fun withChildEntries(project: Project, entries: List<BaseEntry>): List<BaseEntry> {
+        val settings = NavigatorSettings.getInstance()
+        if (!settings.leftPaneChildren) return entries
+        return entries.flatMap { entry ->
+            if (!entry.isDirectory) listOf(entry)
+            else listOf(entry) + childEntries(project, entry, settings.leftPaneChildFiles)
+        }
+    }
+
+    private fun childEntries(project: Project, parent: BaseEntry, includeFiles: Boolean): List<BaseEntry> =
+        BrowseTree.visibleChildren(project, parent.file)
+            .filter { it.isDirectory || includeFiles }
+            .map { child ->
+                if (child.isDirectory) entryFor(project, child).copy(indent = 1)
+                else BaseEntry(child, child.name, false, indent = 1)
+            }
+
     private fun sortEntries(entries: List<BaseEntry>): List<BaseEntry> =
         entries.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
 
@@ -124,11 +142,14 @@ object ScopeResolver {
         val outside = topLevelRoots(contentRoots, base).map {
             if (it.isDirectory) entryFor(project, it) else BaseEntry(it, it.name, false)
         }
-        val entries = assembleProjectEntries(
+        val assembled = assembleProjectEntries(
             base?.let { entryFor(project, it) },
             base?.let { entriesForBase(project, it) }.orEmpty(),
             outside,
         )
+        val entries =
+            if (outside.isEmpty() && base != null) assembled
+            else withChildEntries(project, assembled)
         return Resolved(entries, ProjectScope.getContentScope(project), false)
     }
 }

@@ -14,6 +14,8 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         var hideDotFiles: Boolean = true,
         var compactFolders: Boolean = true,
         var showPreview: Boolean = false,
+        var leftPaneChildren: Boolean = true,
+        var leftPaneChildFiles: Boolean = true,
     )
 
     private var current = State()
@@ -40,6 +42,18 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         get() = current.showPreview
         set(value) {
             current.showPreview = value
+        }
+
+    var leftPaneChildren: Boolean
+        get() = current.leftPaneChildren
+        set(value) {
+            current.leftPaneChildren = value
+        }
+
+    var leftPaneChildFiles: Boolean
+        get() = current.leftPaneChildFiles
+        set(value) {
+            current.leftPaneChildFiles = value
         }
 
     companion object {

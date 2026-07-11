@@ -10,6 +10,8 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.IconUtil
+import com.intellij.util.ui.JBUI
+import java.awt.Insets
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.DefaultListModel
@@ -34,6 +36,8 @@ class RootListPanel(
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.emptyText.text = "Empty"
         list.cellRenderer = object : ColoredListCellRenderer<BaseEntry>() {
+            private val baseLeftInset = ipad.left
+
             override fun customizeCellRenderer(
                 list: JList<out BaseEntry>,
                 value: BaseEntry,
@@ -41,6 +45,7 @@ class RootListPanel(
                 selected: Boolean,
                 hasFocus: Boolean,
             ) {
+                ipad = Insets(ipad.top, baseLeftInset + JBUI.scale(16) * value.indent, ipad.bottom, ipad.right)
                 icon = IconUtil.getIcon(value.file, 0, project)
                 val count = counts?.get(value)
                 val nameAttributes =

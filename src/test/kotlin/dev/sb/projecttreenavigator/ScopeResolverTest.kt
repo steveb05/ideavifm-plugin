@@ -141,6 +141,51 @@ class ScopeResolverTest : BasePlatformTestCase() {
         }
     }
 
+    fun testWithChildEntriesInsertsIndentedChildren() {
+        myFixture.addFileToProject("wce/engine/core/x.txt", "")
+        myFixture.addFileToProject("wce/engine/modules/y.txt", "")
+        myFixture.addFileToProject("wce/engine/readme.md", "")
+        val engine = myFixture.findFileInTempDir("wce/engine")
+        withLeftChildren(children = true, files = true) {
+            val entries = ScopeResolver.withChildEntries(project, listOf(BaseEntry(engine, "engine", true)))
+            assertEquals(listOf("engine", "core", "modules", "readme.md"), entries.map { it.name })
+            assertEquals(listOf(0, 1, 1, 1), entries.map { it.indent })
+        }
+    }
+
+    fun testWithChildEntriesSkipsFilesWhenDisabled() {
+        myFixture.addFileToProject("wcf/engine/core/x.txt", "")
+        myFixture.addFileToProject("wcf/engine/readme.md", "")
+        val engine = myFixture.findFileInTempDir("wcf/engine")
+        withLeftChildren(children = true, files = false) {
+            val entries = ScopeResolver.withChildEntries(project, listOf(BaseEntry(engine, "engine", true)))
+            assertEquals(listOf("engine", "core"), entries.map { it.name })
+        }
+    }
+
+    fun testWithChildEntriesDisabledKeepsEntries() {
+        myFixture.addFileToProject("wcd/engine/core/x.txt", "")
+        val engine = myFixture.findFileInTempDir("wcd/engine")
+        withLeftChildren(children = false, files = true) {
+            val original = listOf(BaseEntry(engine, "engine", true))
+            assertEquals(original, ScopeResolver.withChildEntries(project, original))
+        }
+    }
+
+    private fun withLeftChildren(children: Boolean, files: Boolean, block: () -> Unit) {
+        val settings = NavigatorSettings.getInstance()
+        val beforeChildren = settings.leftPaneChildren
+        val beforeFiles = settings.leftPaneChildFiles
+        settings.leftPaneChildren = children
+        settings.leftPaneChildFiles = files
+        try {
+            block()
+        } finally {
+            settings.leftPaneChildren = beforeChildren
+            settings.leftPaneChildFiles = beforeFiles
+        }
+    }
+
     private fun withCompact(enabled: Boolean, block: () -> Unit) {
         val settings = NavigatorSettings.getInstance()
         val before = settings.compactFolders
