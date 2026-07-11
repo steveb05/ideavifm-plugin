@@ -1,5 +1,6 @@
 package dev.sb.projecttreenavigator
 
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.roots.ModuleRootManager
@@ -45,19 +46,31 @@ object ScopeResolver {
 
         NavigatorScope.Module -> {
             val module = context.module
-            val roots = module?.let { ModuleRootManager.getInstance(it).contentRoots.toList() }.orEmpty()
-            when {
-                module == null || roots.isEmpty() -> projectResolved(context).copy(fellBack = true)
-                roots.size == 1 -> Resolved(
-                    entriesForBase(context.project, roots.single()),
-                    module.moduleContentScope,
-                    false,
+            if (module == null) {
+                projectResolved(context).copy(fellBack = true)
+            } else {
+                val all = ModuleManager.getInstance(context.project).modules.toList()
+                val familyNames = moduleFamilyNames(all.map { it.name }, module.name).toSet()
+                val family = all.filter { it.name in familyNames }.ifEmpty { listOf(module) }
+                val roots = topLevelRoots(
+                    family.flatMap { ModuleRootManager.getInstance(it).contentRoots.toList() },
+                    null,
                 )
-                else -> Resolved(
-                    withChildEntries(context.project, withParentHints(roots.map { entryFor(context.project, it) })),
-                    module.moduleContentScope,
-                    false,
-                )
+                val searchScope = family.map { it.moduleContentScope }.reduce { a, b -> a.uniteWith(b) }
+                when {
+                    roots.isEmpty() -> projectResolved(context).copy(fellBack = true)
+                    roots.size == 1 -> Resolved(
+                        entriesForBase(context.project, roots.single()),
+                        searchScope,
+                        false,
+                    )
+
+                    else -> Resolved(
+                        withChildEntries(context.project, withParentHints(roots.map { entryFor(context.project, it) })),
+                        searchScope,
+                        false,
+                    )
+                }
             }
         }
 
@@ -92,6 +105,12 @@ object ScopeResolver {
             (base == null || !VfsUtilCore.isAncestor(base, root, false)) &&
                 roots.none { other -> other != root && VfsUtilCore.isAncestor(other, root, true) }
         }
+
+    fun moduleFamilyNames(allNames: List<String>, moduleName: String): List<String> {
+        val prefix = moduleName.substringBeforeLast('.', "")
+        if (prefix.isEmpty()) return listOf(moduleName)
+        return allNames.filter { it == prefix || it.startsWith("$prefix.") }
+    }
 
     fun withParentHints(entries: List<BaseEntry>): List<BaseEntry> {
         val duplicated = entries.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys

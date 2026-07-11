@@ -172,6 +172,18 @@ class ScopeResolverTest : BasePlatformTestCase() {
         }
     }
 
+    fun testModuleFamilyNamesGroupsSourceSetSiblings() {
+        val all = listOf("extension", "extension.main", "extension.test", "engine", "other.main")
+        assertEquals(
+            listOf("extension", "extension.main", "extension.test"),
+            ScopeResolver.moduleFamilyNames(all, "extension.main"),
+        )
+    }
+
+    fun testModuleFamilyNamesPlainNameIsItself() {
+        assertEquals(listOf("engine"), ScopeResolver.moduleFamilyNames(listOf("engine", "extension"), "engine"))
+    }
+
     private fun withLeftChildren(children: Boolean, files: Boolean, block: () -> Unit) {
         val settings = NavigatorSettings.getInstance()
         val beforeChildren = settings.leftPaneChildren
