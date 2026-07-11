@@ -120,6 +120,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         registerKey("RIGHT", isEnabled = { searchField.text.isEmpty() }) { expandSelection() }
         registerKey("LEFT", isEnabled = { searchField.text.isEmpty() }) { collapseSelection() }
         registerKey("ENTER") { commitSelection() }
+        registerKey("TAB") { cycleScope(1) }
+        registerKey("shift TAB") { cycleScope(-1) }
     }
 
     private fun registerKey(
@@ -145,14 +147,25 @@ class NavigatorPopup(private val context: NavigatorContext) {
         activeAlarm.addRequest({ refresh() }, 50)
     }
 
+    private fun cycleScope(delta: Int) {
+        scopeIndex = ((scopeIndex + delta) % scopes.size + scopes.size) % scopes.size
+        zoomStack.clear()
+        refresh()
+    }
+
     private fun refresh() {
         val query = searchField.text.trim()
-        val resolved = ScopeResolver.resolve(scopes[scopeIndex], context)
+        val scope = scopes[scopeIndex]
+        val resolved = ScopeResolver.resolve(scope, context)
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
-            generation++
             currentMatcher = null
-            showBrowseTree(resolved)
+            if (scope is NavigatorScope.Named) {
+                showNamedScopeBrowse(scope, resolved)
+            } else {
+                generation++
+                showBrowseTree(resolved)
+            }
             return
         }
         runFilterSearch(query, resolved)
@@ -261,6 +274,46 @@ class NavigatorPopup(private val context: NavigatorContext) {
         if (tree.selectionPath == null && tree.rowCount > 0) tree.setSelectionRow(0)
     }
 
+    private fun showNamedScopeBrowse(named: NavigatorScope.Named, resolved: ScopeResolver.Resolved) {
+        val activePopup = popup ?: return
+        val gen = ++generation
+        ReadAction.nonBlocking<NamedScopeFiles.Result> {
+            NamedScopeFiles.collect(project, named.namedScope)
+        }
+            .coalesceBy(this)
+            .expireWith(activePopup)
+            .finishOnUiThread(ModalityState.stateForComponent(panel)) { result ->
+                if (gen != generation) return@finishOnUiThread
+                val zoomed = zoomStack.lastOrNull()
+                val files = result.files
+                    .filter { zoomed == null || VfsUtilCore.isAncestor(zoomed, it, false) }
+                    .map { FileNameSearch.RankedFile(it, 0) }
+                val footer =
+                    if (result.truncated) "Scope truncated to ${NamedScopeFiles.DEFAULT_LIMIT} files"
+                    else null
+                setPrunedModel(files, effectiveRoots(resolved), expandAll = false, footer = footer)
+                TreeUtil.expand(tree, 1)
+                tree.emptyText.text = "No files in scope"
+                val current = context.currentFile
+                if (current != null) selectFileNode(current)
+            }
+            .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun selectFileNode(file: VirtualFile) {
+        val hiddenRoot = (tree.model as DefaultTreeModel).root as DefaultMutableTreeNode
+        val enumeration = hiddenRoot.depthFirstEnumeration()
+        while (enumeration.hasMoreElements()) {
+            val node = enumeration.nextElement() as DefaultMutableTreeNode
+            if (nodeData(node)?.file == file) {
+                val path = TreePath(node.path)
+                tree.selectionPath = path
+                tree.scrollPathToVisible(path)
+                return
+            }
+        }
+    }
+
     private fun locateFile(file: VirtualFile, roots: List<VirtualFile>) {
         val root = roots.firstOrNull { VfsUtilCore.isAncestor(it, file, false) } ?: return
         val model = tree.model as DefaultTreeModel
@@ -344,7 +397,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val chips = scopes.mapIndexed { i, s ->
             if (i == scopeIndex) "<b>[${s.label}]</b>" else "[${s.label}]"
         }
-        scopeLabel.text = "<html>${chips.joinToString(" ")}</html>"
+        val hint = if (resolved.fellBack) "  (no current file, showing project)" else ""
+        val zoomed = zoomStack.lastOrNull()
+        val zoomText = zoomed?.let {
+            val base = project.basePath.orEmpty()
+            val shown = if (base.isNotEmpty()) it.path.removePrefix(base).trimStart('/') else it.path
+            "  zoomed: $shown/"
+        }.orEmpty()
+        scopeLabel.text = "<html>${chips.joinToString(" ")}$hint$zoomText</html>"
     }
 
     private fun setFooter(text: String?) {
