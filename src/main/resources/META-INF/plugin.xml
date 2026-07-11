@@ -1,0 +1,9 @@
+<idea-plugin>
+    <id>dev.sb.projecttreenavigator</id>
+    <name>Project Tree Navigator</name>
+    <vendor>sb</vendor>
+    <description><![CDATA[
+        Keyboard driven popup for navigating the project file tree with Search Everywhere style filtering, scope chips, and folder zoom.
+    ]]></description>
+    <depends>com.intellij.modules.platform</depends>
+</idea-plugin>
