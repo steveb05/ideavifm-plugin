@@ -20,6 +20,7 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2025.2")
         testFramework(TestFrameworkType.Platform)
+        testBundledPlugin("org.jetbrains.kotlin")
     }
     testImplementation("junit:junit:4.13.2")
 }
