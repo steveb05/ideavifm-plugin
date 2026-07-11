@@ -3,23 +3,31 @@ package dev.sb.projecttreenavigator
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CustomShortcutSet
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.codeStyle.MinusculeMatcher
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.Alarm
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
+import com.intellij.util.ui.tree.TreeUtil
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.Box
+import javax.swing.event.DocumentEvent
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
@@ -43,6 +51,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var popup: JBPopup? = null
     private var generation = 0
     private var currentMatcher: MinusculeMatcher? = null
+    private val fileNameSearch = FileNameSearch(project)
+    private var alarm: Alarm? = null
 
     fun show() {
         buildPanel()
@@ -57,6 +67,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .setDimensionServiceKey(project, "dev.sb.projecttreenavigator.Popup", true)
             .createPopup()
         popup = created
+        alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, created)
+        searchField.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = scheduleRefresh()
+        })
         registerKeys()
         refresh()
         created.showCenteredInCurrentWindow(project)
@@ -125,11 +139,115 @@ class NavigatorPopup(private val context: NavigatorContext) {
         action.registerCustomShortcutSet(CustomShortcutSet.fromString(shortcut), panel, activePopup)
     }
 
+    private fun scheduleRefresh() {
+        val activeAlarm = alarm ?: return
+        activeAlarm.cancelAllRequests()
+        activeAlarm.addRequest({ refresh() }, 50)
+    }
+
     private fun refresh() {
+        val query = searchField.text.trim()
         val resolved = ScopeResolver.resolve(scopes[scopeIndex], context)
         updateScopeLabel(resolved)
-        currentMatcher = null
-        showBrowseTree(resolved)
+        if (query.isEmpty()) {
+            currentMatcher = null
+            showBrowseTree(resolved)
+            return
+        }
+        runFilterSearch(query, resolved)
+    }
+
+    private fun runFilterSearch(query: String, resolved: ScopeResolver.Resolved) {
+        val activePopup = popup ?: return
+        val gen = ++generation
+        if (DumbService.getInstance(project).isDumb) {
+            setFooter("Search available after indexing finishes")
+            DumbService.getInstance(project).runWhenSmart {
+                if (gen == generation && !activePopup.isDisposed) refresh()
+            }
+            return
+        }
+        val searchScope = zoomedSearchScope(resolved)
+        ReadAction.nonBlocking<FileNameSearch.Result> {
+            fileNameSearch.search(query, searchScope)
+        }
+            .coalesceBy(this)
+            .expireWith(activePopup)
+            .finishOnUiThread(ModalityState.stateForComponent(panel)) { result ->
+                if (gen != generation) return@finishOnUiThread
+                currentMatcher = FileNameSearch.nameMatcher(query)
+                val footer =
+                    if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
+                    else null
+                setPrunedModel(result.files, effectiveRoots(resolved), expandAll = true, footer = footer)
+                tree.emptyText.text = "Nothing found"
+            }
+            .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun zoomedSearchScope(resolved: ScopeResolver.Resolved): com.intellij.psi.search.GlobalSearchScope {
+        val zoomed = zoomStack.lastOrNull() ?: return resolved.searchScope
+        return resolved.searchScope.intersectWith(
+            com.intellij.psi.search.GlobalSearchScopesCore.directoryScope(project, zoomed, true),
+        )
+    }
+
+    private fun setPrunedModel(
+        ranked: List<FileNameSearch.RankedFile>,
+        roots: List<VirtualFile>,
+        expandAll: Boolean,
+        footer: String?,
+    ) {
+        val byRoot = LinkedHashMap<VirtualFile, MutableList<FileNameSearch.RankedFile>>()
+        for (item in ranked) {
+            val root = roots.firstOrNull { VfsUtilCore.isAncestor(it, item.file, false) } ?: continue
+            byRoot.getOrPut(root) { mutableListOf() }.add(item)
+        }
+        val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(null, "", true))
+        for ((root, matches) in byRoot) {
+            val prunedMatches = matches.mapNotNull { m ->
+                val relative = VfsUtilCore.getRelativePath(m.file, root) ?: return@mapNotNull null
+                if (relative.isEmpty()) return@mapNotNull null
+                PrunedMatch(relative.split('/'), m.file, m.weight)
+            }
+            val rootNode = DefaultMutableTreeNode(NavigatorNodeData(root, root.name, true))
+            appendPruned(rootNode, PrunedTreeBuilder.build(prunedMatches))
+            hiddenRoot.add(rootNode)
+        }
+        tree.model = DefaultTreeModel(hiddenRoot)
+        if (expandAll) TreeUtil.expandAll(tree)
+        selectBestMatch(hiddenRoot)
+        setFooter(footer)
+    }
+
+    private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<VirtualFile>>) {
+        val parentFile = (parent.userObject as NavigatorNodeData).file
+        for (n in nodes) {
+            val file = n.payload ?: parentFile?.findChild(n.name)
+            val child = DefaultMutableTreeNode(
+                NavigatorNodeData(file, n.name, n.payload == null, n.weight),
+            )
+            parent.add(child)
+            if (n.payload == null) appendPruned(child, n.children)
+        }
+    }
+
+    private fun selectBestMatch(hiddenRoot: DefaultMutableTreeNode) {
+        var best: DefaultMutableTreeNode? = null
+        var bestWeight = Int.MIN_VALUE
+        val enumeration = hiddenRoot.depthFirstEnumeration()
+        while (enumeration.hasMoreElements()) {
+            val node = enumeration.nextElement() as DefaultMutableTreeNode
+            val data = nodeData(node) ?: continue
+            if (!data.isDirectory && data.weight > bestWeight) {
+                best = node
+                bestWeight = data.weight
+            }
+        }
+        val target = best ?: return
+        val path = TreePath(target.path)
+        tree.selectionPath = path
+        tree.scrollPathToVisible(path)
     }
 
     private fun showBrowseTree(resolved: ScopeResolver.Resolved) {
