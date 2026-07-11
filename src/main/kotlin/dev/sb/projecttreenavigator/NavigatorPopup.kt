@@ -10,6 +10,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.codeStyle.MinusculeMatcher
@@ -412,14 +413,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun updateScopeLabel(resolved: ScopeResolver.Resolved) {
         val chips = scopes.mapIndexed { i, s ->
-            if (i == scopeIndex) "<b>[${s.label}]</b>" else "[${s.label}]"
+            val label = StringUtil.escapeXmlEntities(s.label)
+            if (i == scopeIndex) "<b>[$label]</b>" else "[$label]"
         }
         val hint = if (resolved.fellBack) "  (no current file, showing project)" else ""
         val zoomed = zoomStack.lastOrNull()
         val zoomText = zoomed?.let {
             val base = project.basePath.orEmpty()
             val shown = if (base.isNotEmpty()) it.path.removePrefix(base).trimStart('/') else it.path
-            "  zoomed: $shown/"
+            "  zoomed: ${StringUtil.escapeXmlEntities(shown)}/"
         }.orEmpty()
         scopeLabel.text = "<html>${chips.joinToString(" ")}$hint$zoomText</html>"
     }
