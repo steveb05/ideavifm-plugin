@@ -8,22 +8,32 @@ import javax.swing.KeyStroke
 
 class NavigatorCommandTest : BasePlatformTestCase() {
 
-    fun testDefaultShortcutUsedWhenKeymapHasNone() {
-        val set = NavigatorCommand.LEFT_UP.shortcutSet()
+    fun testDefaultsComeFromKeymap() {
         assertEquals(
             CustomShortcutSet.fromString("alt K").shortcuts.toList(),
-            set.shortcuts.toList(),
+            NavigatorCommand.LEFT_UP.shortcutSet().shortcuts.toList(),
         )
     }
 
-    fun testKeymapAssignmentWins() {
+    fun testKeymapAssignmentAddsShortcut() {
         val keymap = KeymapManager.getInstance().activeKeymap
         val shortcut = KeyboardShortcut(KeyStroke.getKeyStroke("alt U"), null)
         keymap.addShortcut(NavigatorCommand.LEFT_UP.actionId, shortcut)
         try {
-            assertEquals(listOf(shortcut), NavigatorCommand.LEFT_UP.shortcutSet().shortcuts.toList())
+            assertTrue(NavigatorCommand.LEFT_UP.shortcutSet().shortcuts.toList().contains(shortcut))
         } finally {
             keymap.removeShortcut(NavigatorCommand.LEFT_UP.actionId, shortcut)
+        }
+    }
+
+    fun testRemovedDefaultIsRespected() {
+        val keymap = KeymapManager.getInstance().activeKeymap
+        val default = KeyboardShortcut(KeyStroke.getKeyStroke("alt K"), null)
+        keymap.removeShortcut(NavigatorCommand.LEFT_UP.actionId, default)
+        try {
+            assertTrue(NavigatorCommand.LEFT_UP.shortcutSet().shortcuts.isEmpty())
+        } finally {
+            keymap.addShortcut(NavigatorCommand.LEFT_UP.actionId, default)
         }
     }
 }

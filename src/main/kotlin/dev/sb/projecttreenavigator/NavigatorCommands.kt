@@ -10,24 +10,21 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.popup.JBPopup
 import javax.swing.JComponent
 
-enum class NavigatorCommand(val actionId: String, val defaultShortcut: String) {
-    LEFT_UP("ProjectTreeNavigator.LeftUp", "alt K"),
-    LEFT_DOWN("ProjectTreeNavigator.LeftDown", "alt J"),
-    RIGHT_UP("ProjectTreeNavigator.RightUp", "control K"),
-    RIGHT_DOWN("ProjectTreeNavigator.RightDown", "control J"),
-    PANE_LEFT("ProjectTreeNavigator.PaneLeft", "control H"),
-    PANE_RIGHT("ProjectTreeNavigator.PaneRight", "control L"),
-    ZOOM_IN("ProjectTreeNavigator.ZoomIn", "control ENTER"),
-    ZOOM_OUT("ProjectTreeNavigator.ZoomOut", "BACK_SPACE"),
-    TOGGLE_PREVIEW("ProjectTreeNavigator.TogglePreview", "alt P"),
-    TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles", "control PERIOD"),
+enum class NavigatorCommand(val actionId: String) {
+    LEFT_UP("ProjectTreeNavigator.LeftUp"),
+    LEFT_DOWN("ProjectTreeNavigator.LeftDown"),
+    RIGHT_UP("ProjectTreeNavigator.RightUp"),
+    RIGHT_DOWN("ProjectTreeNavigator.RightDown"),
+    PANE_LEFT("ProjectTreeNavigator.PaneLeft"),
+    PANE_RIGHT("ProjectTreeNavigator.PaneRight"),
+    ZOOM_IN("ProjectTreeNavigator.ZoomIn"),
+    ZOOM_OUT("ProjectTreeNavigator.ZoomOut"),
+    TOGGLE_PREVIEW("ProjectTreeNavigator.TogglePreview"),
+    TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles"),
     ;
 
-    fun shortcutSet(): CustomShortcutSet {
-        val assigned = KeymapUtil.getActiveKeymapShortcuts(actionId).shortcuts
-        if (assigned.isNotEmpty()) return CustomShortcutSet(*assigned)
-        return CustomShortcutSet.fromString(defaultShortcut)
-    }
+    fun shortcutSet(): CustomShortcutSet =
+        CustomShortcutSet(*KeymapUtil.getActiveKeymapShortcuts(actionId).shortcuts)
 }
 
 class NavigatorCommandStubAction : AnAction(), DumbAware {

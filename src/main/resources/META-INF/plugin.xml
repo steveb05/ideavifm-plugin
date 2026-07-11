@@ -22,25 +22,45 @@
         </action>
         <group id="ProjectTreeNavigator.Commands" text="Project Tree Navigator" popup="false">
             <action id="ProjectTreeNavigator.LeftUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Left Pane Up" description="Move the left pane selection up in the navigator popup"/>
+                    text="Navigator: Left Pane Up" description="Move the left pane selection up in the navigator popup">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt K"/>
+            </action>
             <action id="ProjectTreeNavigator.LeftDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Left Pane Down" description="Move the left pane selection down in the navigator popup"/>
+                    text="Navigator: Left Pane Down" description="Move the left pane selection down in the navigator popup">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt J"/>
+            </action>
             <action id="ProjectTreeNavigator.RightUp" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Right Pane Up" description="Move the right pane selection up in the navigator popup"/>
+                    text="Navigator: Right Pane Up" description="Move the right pane selection up in the navigator popup">
+                <keyboard-shortcut keymap="$default" first-keystroke="control K"/>
+            </action>
             <action id="ProjectTreeNavigator.RightDown" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Right Pane Down" description="Move the right pane selection down in the navigator popup"/>
+                    text="Navigator: Right Pane Down" description="Move the right pane selection down in the navigator popup">
+                <keyboard-shortcut keymap="$default" first-keystroke="control J"/>
+            </action>
             <action id="ProjectTreeNavigator.PaneLeft" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Collapse or Exit Left" description="Collapse, walk to the parent, or cross into the left pane"/>
+                    text="Navigator: Collapse or Exit Left" description="Collapse, walk to the parent, or cross into the left pane">
+                <keyboard-shortcut keymap="$default" first-keystroke="control H"/>
+            </action>
             <action id="ProjectTreeNavigator.PaneRight" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Expand or Enter Right" description="Expand the folder or enter the right pane"/>
+                    text="Navigator: Expand or Enter Right" description="Expand the folder or enter the right pane">
+                <keyboard-shortcut keymap="$default" first-keystroke="control L"/>
+            </action>
             <action id="ProjectTreeNavigator.ZoomIn" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Zoom In" description="Make the selected folder the base of both panes"/>
+                    text="Navigator: Zoom In" description="Make the selected folder the base of both panes">
+                <keyboard-shortcut keymap="$default" first-keystroke="control ENTER"/>
+            </action>
             <action id="ProjectTreeNavigator.ZoomOut" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Zoom Out" description="Pop the navigator zoom stack"/>
+                    text="Navigator: Zoom Out" description="Pop the navigator zoom stack">
+                <keyboard-shortcut keymap="$default" first-keystroke="BACK_SPACE"/>
+            </action>
             <action id="ProjectTreeNavigator.TogglePreview" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Toggle Preview" description="Show or hide the navigator preview pane"/>
+                    text="Navigator: Toggle Preview" description="Show or hide the navigator preview pane">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt P"/>
+            </action>
             <action id="ProjectTreeNavigator.ToggleDotFiles" class="dev.sb.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: Toggle Dot Files" description="Show or hide dot files in the navigator"/>
+                    text="Navigator: Toggle Dot Files" description="Show or hide dot files in the navigator">
+                <keyboard-shortcut keymap="$default" first-keystroke="control PERIOD"/>
+            </action>
         </group>
     </actions>
 </idea-plugin>
