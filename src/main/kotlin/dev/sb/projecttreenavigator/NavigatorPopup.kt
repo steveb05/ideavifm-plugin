@@ -48,8 +48,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
         { currentMatcher },
         onActivate = { setActivePane(Pane.RIGHT) },
         onCommit = { commitSelection() },
+        onHover = { previewHover(it) },
+        onSelectionChanged = { refreshPreview() },
     )
-    private val rootList = RootListPanel(project) { onUserListSelection() }
+    private val rootList = RootListPanel(
+        project,
+        onUserSelection = { onUserListSelection() },
+        onHover = { previewHover(it) },
+    )
+    private val previewPanel = PreviewPanel(project)
     private val panel = BorderLayoutPanel()
 
     private var popup: JBPopup? = null
@@ -77,6 +84,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .setDimensionServiceKey(project, "dev.sb.projecttreenavigator.Popup", true)
             .createPopup()
         popup = created
+        previewPanel.attach(created)
         alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, created)
         searchField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) = scheduleRefresh()
@@ -97,11 +105,16 @@ class NavigatorPopup(private val context: NavigatorContext) {
         header.add(searchField)
         val splitter = OnePixelSplitter(false, "dev.sb.projecttreenavigator.Splitter", 0.25f)
         splitter.firstComponent = rootList.component
-        splitter.secondComponent = treePanel.component
+        val rightSplit = OnePixelSplitter(false, "dev.sb.projecttreenavigator.PreviewSplitter", 0.55f)
+        rightSplit.firstComponent = treePanel.component
+        rightSplit.secondComponent = previewPanel.component
+        splitter.secondComponent = rightSplit
+        applyPreviewVisibility()
         panel.addToTop(header)
         panel.addToCenter(splitter)
         panel.addToBottom(footerLabel)
-        panel.preferredSize = Dimension(JBUI.scale(680), JBUI.scale(440))
+        val width = if (NavigatorSettings.getInstance().showPreview) 980 else 680
+        panel.preferredSize = Dimension(JBUI.scale(width), JBUI.scale(440))
 
         searchField.textEditor.columns = 30
     }
@@ -122,6 +135,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind("shift TAB") { cycleScope(-1) }
         commands.bind("control ENTER", isEnabled = { activeSelectedDirectory() != null }) { zoomIn() }
         commands.bind("BACK_SPACE", isEnabled = { searchField.text.isEmpty() && zoomStack.isNotEmpty() }) { zoomOut() }
+        commands.bind("alt P") { togglePreview() }
     }
 
     private fun scheduleRefresh() {
@@ -142,11 +156,39 @@ class NavigatorPopup(private val context: NavigatorContext) {
         activePane = pane
         treePanel.setActive(pane == Pane.RIGHT)
         rootList.setActive(pane == Pane.LEFT)
+        refreshPreview()
     }
 
     private fun onUserListSelection() {
         setActivePane(Pane.LEFT)
         rebuildRight()
+    }
+
+    private fun applyPreviewVisibility() {
+        previewPanel.component.isVisible = NavigatorSettings.getInstance().showPreview
+        panel.revalidate()
+        panel.repaint()
+    }
+
+    private fun refreshPreview() {
+        if (!NavigatorSettings.getInstance().showPreview) return
+        val file = when (activePane) {
+            Pane.LEFT -> rootList.selectedEntry()?.file
+            Pane.RIGHT -> treePanel.selectedFile()
+        }
+        previewPanel.setTarget(file)
+    }
+
+    private fun previewHover(file: VirtualFile) {
+        if (!NavigatorSettings.getInstance().showPreview) return
+        previewPanel.setTarget(file)
+    }
+
+    private fun togglePreview() {
+        val settings = NavigatorSettings.getInstance()
+        settings.showPreview = !settings.showPreview
+        applyPreviewVisibility()
+        refreshPreview()
     }
 
     private fun zoomIn() {
@@ -263,6 +305,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 }
             }
         }
+        refreshPreview()
     }
 
     private fun runFilterSearch(query: String, resolved: ScopeResolver.Resolved) {

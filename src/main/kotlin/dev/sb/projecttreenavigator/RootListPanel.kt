@@ -10,6 +10,8 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.IconUtil
+import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
 import javax.swing.DefaultListModel
 import javax.swing.JComponent
 import javax.swing.JList
@@ -18,6 +20,7 @@ import javax.swing.ListSelectionModel
 class RootListPanel(
     private val project: Project,
     private val onUserSelection: () -> Unit,
+    private val onHover: (VirtualFile) -> Unit = {},
 ) {
 
     private val listModel = DefaultListModel<BaseEntry>()
@@ -53,6 +56,12 @@ class RootListPanel(
         list.addListSelectionListener { e ->
             if (!suppressEvents && !e.valueIsAdjusting) onUserSelection()
         }
+        list.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                val index = list.locationToIndex(e.point)
+                if (index >= 0) onHover(listModel.getElementAt(index).file)
+            }
+        })
     }
 
     fun setActive(active: Boolean) {

@@ -6,7 +6,7 @@ class RootListPanelTest : BasePlatformTestCase() {
 
     fun testSelectionHelpersDoNotFireCallback() {
         var fired = 0
-        val panel = RootListPanel(project) { fired++ }
+        val panel = RootListPanel(project, onUserSelection = { fired++ })
         val ax = myFixture.addFileToProject("a/x.txt", "").virtualFile
         myFixture.addFileToProject("b/y.txt", "")
         val top = myFixture.addFileToProject("top.txt", "").virtualFile
@@ -32,7 +32,7 @@ class RootListPanelTest : BasePlatformTestCase() {
     }
 
     fun testSetEntriesKeepsModelWhenUnchanged() {
-        val panel = RootListPanel(project) { }
+        val panel = RootListPanel(project, onUserSelection = { })
         myFixture.addFileToProject("a/x.txt", "")
         val entries = listOf(BaseEntry(myFixture.findFileInTempDir("a"), "a", true))
         panel.setEntries(entries)

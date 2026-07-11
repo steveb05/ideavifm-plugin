@@ -11,6 +11,7 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.tree.TreeUtil
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
 import javax.swing.JComponent
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeWillExpandListener
@@ -24,6 +25,8 @@ class TreePanel(
     matcherProvider: () -> MinusculeMatcher?,
     private val onActivate: () -> Unit,
     private val onCommit: () -> Unit,
+    private val onHover: (VirtualFile) -> Unit = {},
+    private val onSelectionChanged: () -> Unit = {},
 ) {
 
     enum class CollapseOutcome { COLLAPSED, MOVED_TO_PARENT, AT_TOP_LEVEL }
@@ -49,6 +52,16 @@ class TreePanel(
             override fun mouseClicked(e: MouseEvent) {
                 onActivate()
                 if (e.clickCount == 2) onCommit()
+            }
+        })
+        tree.addTreeSelectionListener { onSelectionChanged() }
+        tree.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                val data =
+                    ((path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? NavigatorNodeData)
+                        ?: return
+                data.file?.let(onHover)
             }
         })
     }
