@@ -18,11 +18,12 @@ object BrowseTree {
 
     private val PLACEHOLDER = NavigatorNodeData(null, "loading", false)
     private const val DOT_WALK_CAP = 32
+    private const val CHAIN_CAP = 32
 
     fun createSubtreeModel(project: Project, base: VirtualFile): DefaultTreeModel {
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base.name, true))
         for (child in visibleChildren(project, base)) {
-            if (child.isDirectory) hiddenRoot.add(directoryNode(child))
+            if (child.isDirectory) hiddenRoot.add(directoryNode(project, child))
             else hiddenRoot.add(DefaultMutableTreeNode(NavigatorNodeData(child, child.name, false)))
         }
         return DefaultTreeModel(hiddenRoot)
@@ -37,7 +38,7 @@ object BrowseTree {
         val dir = (node.userObject as NavigatorNodeData).file ?: return
         node.removeAllChildren()
         for (child in visibleChildren(project, dir)) {
-            if (child.isDirectory) node.add(directoryNode(child))
+            if (child.isDirectory) node.add(directoryNode(project, child))
             else node.add(DefaultMutableTreeNode(NavigatorNodeData(child, child.name, false)))
         }
         model.nodeStructureChanged(node)
@@ -66,8 +67,23 @@ object BrowseTree {
         return false
     }
 
-    private fun directoryNode(dir: VirtualFile): DefaultMutableTreeNode {
-        val node = DefaultMutableTreeNode(NavigatorNodeData(dir, dir.name, true))
+    fun compactChain(project: Project, dir: VirtualFile): Pair<VirtualFile, String> {
+        var deepest = dir
+        val names = StringBuilder(dir.name)
+        if (!NavigatorSettings.getInstance().compactFolders) return deepest to names.toString()
+        var depth = 0
+        while (depth < CHAIN_CAP) {
+            val only = visibleChildren(project, deepest).singleOrNull()?.takeIf { it.isDirectory } ?: break
+            deepest = only
+            names.append('/').append(only.name)
+            depth++
+        }
+        return deepest to names.toString()
+    }
+
+    private fun directoryNode(project: Project, dir: VirtualFile): DefaultMutableTreeNode {
+        val (deepest, name) = compactChain(project, dir)
+        val node = DefaultMutableTreeNode(NavigatorNodeData(deepest, name, true))
         node.add(DefaultMutableTreeNode(PLACEHOLDER))
         return node
     }

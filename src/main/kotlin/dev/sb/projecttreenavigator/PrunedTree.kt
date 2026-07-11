@@ -27,6 +27,18 @@ object PrunedTreeBuilder {
         return freeze(root)
     }
 
+    fun <T> compact(nodes: List<PrunedTreeNode<T>>): List<PrunedTreeNode<T>> = nodes.map { node ->
+        if (node.payload != null) return@map node
+        var name = node.name
+        var current = node
+        while (true) {
+            val only = current.children.singleOrNull()?.takeIf { it.payload == null } ?: break
+            name = name + "/" + only.name
+            current = only
+        }
+        PrunedTreeNode(name, null, node.weight, compact(current.children))
+    }
+
     private class MutableNode<T> {
         val folders = LinkedHashMap<String, MutableNode<T>>()
         val files = ArrayList<PrunedTreeNode<T>>()

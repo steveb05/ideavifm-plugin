@@ -81,6 +81,63 @@ class BrowseTreeTest : BasePlatformTestCase() {
         }
     }
 
+    fun testSubtreeModelCompactsSingleChildChains() {
+        myFixture.addFileToProject("root/a/b/c/deep.txt", "")
+        myFixture.addFileToProject("root/top.txt", "")
+        val rootDir = myFixture.findFileInTempDir("root")
+        withCompact(enabled = true) {
+            val hiddenRoot = BrowseTree.createSubtreeModel(project, rootDir).root as DefaultMutableTreeNode
+            assertEquals(listOf("a/b/c", "top.txt"), childNames(hiddenRoot))
+            val chain = hiddenRoot.firstChild as DefaultMutableTreeNode
+            assertEquals(myFixture.findFileInTempDir("root/a/b/c"), (chain.userObject as NavigatorNodeData).file)
+        }
+        withCompact(enabled = false) {
+            val hiddenRoot = BrowseTree.createSubtreeModel(project, rootDir).root as DefaultMutableTreeNode
+            assertEquals(listOf("a", "top.txt"), childNames(hiddenRoot))
+        }
+    }
+
+    fun testCompactChainStopsAtForks() {
+        myFixture.addFileToProject("root/a/b/stop.txt", "")
+        myFixture.addFileToProject("root/a/b/c/deep.txt", "")
+        val a = myFixture.findFileInTempDir("root/a")
+        withCompact(enabled = true) {
+            val (deepest, name) = BrowseTree.compactChain(project, a)
+            assertEquals("a/b", name)
+            assertEquals(myFixture.findFileInTempDir("root/a/b"), deepest)
+        }
+    }
+
+    fun testCompactChainIgnoresHiddenDotSiblings() {
+        myFixture.addFileToProject("root/a/.git/config", "")
+        myFixture.addFileToProject("root/a/sub/file.txt", "")
+        val a = myFixture.findFileInTempDir("root/a")
+        withDotFiles(hidden = true) {
+            withCompact(enabled = true) {
+                val (deepest, name) = BrowseTree.compactChain(project, a)
+                assertEquals("a/sub", name)
+                assertEquals(myFixture.findFileInTempDir("root/a/sub"), deepest)
+            }
+        }
+    }
+
+    private fun childNames(node: DefaultMutableTreeNode): List<String> =
+        node.children().asSequence()
+            .filterIsInstance<DefaultMutableTreeNode>()
+            .map { (it.userObject as NavigatorNodeData).name }
+            .toList()
+
+    private fun withCompact(enabled: Boolean, block: () -> Unit) {
+        val settings = NavigatorSettings.getInstance()
+        val before = settings.compactFolders
+        settings.compactFolders = enabled
+        try {
+            block()
+        } finally {
+            settings.compactFolders = before
+        }
+    }
+
     private fun withDotFiles(hidden: Boolean, block: () -> Unit) {
         val settings = NavigatorSettings.getInstance()
         val before = settings.hideDotFiles

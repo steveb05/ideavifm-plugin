@@ -79,7 +79,11 @@ class TreePanel(
                 if (relative.isEmpty()) return@mapNotNull null
                 PrunedMatch(relative.split('/'), m.file, m.weight)
             }
-            appendPruned(hiddenRoot, PrunedTreeBuilder.build(prunedMatches))
+            val built = PrunedTreeBuilder.build(prunedMatches)
+            val display =
+                if (NavigatorSettings.getInstance().compactFolders) PrunedTreeBuilder.compact(built)
+                else built
+            appendPruned(hiddenRoot, display)
         }
         tree.model = DefaultTreeModel(hiddenRoot)
     }
@@ -131,15 +135,17 @@ class TreePanel(
     }
 
     fun locate(file: VirtualFile, base: VirtualFile) {
+        if (file == base || !VfsUtilCore.isAncestor(base, file, false)) return
         val model = model()
         var node = model.root as DefaultMutableTreeNode
-        val relative = VfsUtilCore.getRelativePath(file, base) ?: return
-        if (relative.isEmpty()) return
-        for (segment in relative.split('/')) {
+        while (nodeData(node)?.file != file) {
             BrowseTree.loadChildren(project, model, node)
             node = node.children().asSequence()
                 .filterIsInstance<DefaultMutableTreeNode>()
-                .firstOrNull { nodeData(it)?.name == segment } ?: return
+                .firstOrNull { child ->
+                    val childFile = nodeData(child)?.file
+                    childFile != null && VfsUtilCore.isAncestor(childFile, file, false)
+                } ?: return
         }
         val path = TreePath(node.path)
         path.parentPath?.let { tree.expandPath(it) }
@@ -191,7 +197,7 @@ class TreePanel(
     private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<VirtualFile>>) {
         val parentFile = (parent.userObject as NavigatorNodeData).file
         for (n in nodes) {
-            val file = n.payload ?: parentFile?.findChild(n.name)
+            val file = n.payload ?: n.name.split('/').fold(parentFile) { acc, segment -> acc?.findChild(segment) }
             val child = DefaultMutableTreeNode(
                 NavigatorNodeData(file, n.name, n.payload == null, n.weight),
             )

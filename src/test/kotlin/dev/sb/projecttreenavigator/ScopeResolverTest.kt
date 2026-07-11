@@ -129,4 +129,26 @@ class ScopeResolverTest : BasePlatformTestCase() {
         )
         assertEquals(listOf("alpha", "zeta"), entries.map { it.name })
     }
+
+    fun testEntriesForBaseCompactChains() {
+        myFixture.addFileToProject("cbase/a/b/x.txt", "")
+        myFixture.addFileToProject("cbase/top.txt", "")
+        val base = myFixture.findFileInTempDir("cbase")
+        withCompact(enabled = true) {
+            val entries = ScopeResolver.entriesForBase(project, base)
+            assertEquals(listOf("a/b", "top.txt"), entries.map { it.name })
+            assertEquals(myFixture.findFileInTempDir("cbase/a/b"), entries.first().file)
+        }
+    }
+
+    private fun withCompact(enabled: Boolean, block: () -> Unit) {
+        val settings = NavigatorSettings.getInstance()
+        val before = settings.compactFolders
+        settings.compactFolders = enabled
+        try {
+            block()
+        } finally {
+            settings.compactFolders = before
+        }
+    }
 }

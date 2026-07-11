@@ -53,7 +53,7 @@ object ScopeResolver {
                     false,
                 )
                 else -> Resolved(
-                    withParentHints(roots.map { BaseEntry(it, it.name, true) }),
+                    withParentHints(roots.map { entryFor(context.project, it) }),
                     module.moduleContentScope,
                     false,
                 )
@@ -75,8 +75,16 @@ object ScopeResolver {
         )
     }
 
+    fun entryFor(project: Project, dir: VirtualFile): BaseEntry {
+        val (deepest, name) = BrowseTree.compactChain(project, dir)
+        return BaseEntry(deepest, name, true)
+    }
+
     fun entriesForBase(project: Project, base: VirtualFile): List<BaseEntry> =
-        BrowseTree.visibleChildren(project, base).map { BaseEntry(it, it.name, it.isDirectory) }
+        BrowseTree.visibleChildren(project, base).map { child ->
+            if (child.isDirectory) entryFor(project, child)
+            else BaseEntry(child, child.name, false)
+        }
 
     fun topLevelRoots(roots: List<VirtualFile>, base: VirtualFile?): List<VirtualFile> =
         roots.distinct().filter { root ->
@@ -113,9 +121,11 @@ object ScopeResolver {
         val project = context.project
         val base = project.guessProjectDir()
         val contentRoots = ProjectRootManager.getInstance(project).contentRoots.toList()
-        val outside = topLevelRoots(contentRoots, base).map { BaseEntry(it, it.name, it.isDirectory) }
+        val outside = topLevelRoots(contentRoots, base).map {
+            if (it.isDirectory) entryFor(project, it) else BaseEntry(it, it.name, false)
+        }
         val entries = assembleProjectEntries(
-            base?.let { BaseEntry(it, it.name, true) },
+            base?.let { entryFor(project, it) },
             base?.let { entriesForBase(project, it) }.orEmpty(),
             outside,
         )
