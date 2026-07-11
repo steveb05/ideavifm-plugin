@@ -33,10 +33,7 @@ object ScopeResolver {
         val entries: List<BaseEntry>,
         val searchScope: GlobalSearchScope,
         val fellBack: Boolean,
-    ) {
-        // TODO remove after NavigatorPopup switches to entries (task 6)
-        val roots: List<VirtualFile> get() = entries.map { it.file }
-    }
+    )
 
     fun availableScopes(context: NavigatorContext): List<NavigatorScope> =
         listOf(NavigatorScope.Project, NavigatorScope.Module, NavigatorScope.Folder) +
