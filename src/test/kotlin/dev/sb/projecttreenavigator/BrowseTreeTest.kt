@@ -30,22 +30,24 @@ class BrowseTreeTest : BasePlatformTestCase() {
         }
     }
 
-    fun testModelLoadsChildrenLazily() {
+    fun testSubtreeModelLoadsChildrenLazily() {
         myFixture.addFileToProject("root/sub/deep.txt", "")
+        myFixture.addFileToProject("root/top.txt", "")
         val rootDir = myFixture.findFileInTempDir("root")
-        val model = BrowseTree.createModel(project, listOf(rootDir))
+        val model = BrowseTree.createSubtreeModel(project, rootDir)
         val hiddenRoot = model.root as DefaultMutableTreeNode
-        assertEquals(1, hiddenRoot.childCount)
-
-        val rootNode = hiddenRoot.firstChild as DefaultMutableTreeNode
-        assertFalse(BrowseTree.isLoaded(rootNode))
-
-        BrowseTree.loadChildren(project, model, rootNode)
-        assertTrue(BrowseTree.isLoaded(rootNode))
-        val sub = rootNode.firstChild as DefaultMutableTreeNode
-        val data = sub.userObject as NavigatorNodeData
-        assertEquals("sub", data.name)
-        assertTrue(data.isDirectory)
+        assertTrue(BrowseTree.isLoaded(hiddenRoot))
+        assertEquals(rootDir, (hiddenRoot.userObject as NavigatorNodeData).file)
+        val names = hiddenRoot.children().asSequence()
+            .filterIsInstance<DefaultMutableTreeNode>()
+            .map { (it.userObject as NavigatorNodeData).name }
+            .toList()
+        assertEquals(listOf("sub", "top.txt"), names)
+        val sub = hiddenRoot.firstChild as DefaultMutableTreeNode
         assertFalse(BrowseTree.isLoaded(sub))
+        BrowseTree.loadChildren(project, model, sub)
+        assertTrue(BrowseTree.isLoaded(sub))
+        val deep = sub.firstChild as DefaultMutableTreeNode
+        assertEquals("deep.txt", (deep.userObject as NavigatorNodeData).name)
     }
 }

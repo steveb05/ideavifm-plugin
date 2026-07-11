@@ -23,6 +23,15 @@ object BrowseTree {
         return DefaultTreeModel(hiddenRoot)
     }
 
+    fun createSubtreeModel(project: Project, base: VirtualFile): DefaultTreeModel {
+        val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base.name, true))
+        for (child in visibleChildren(project, base)) {
+            if (child.isDirectory) hiddenRoot.add(directoryNode(child))
+            else hiddenRoot.add(DefaultMutableTreeNode(NavigatorNodeData(child, child.name, false)))
+        }
+        return DefaultTreeModel(hiddenRoot)
+    }
+
     fun isLoaded(node: DefaultMutableTreeNode): Boolean =
         node.childCount != 1 ||
             (node.firstChild as DefaultMutableTreeNode).userObject !== PLACEHOLDER
