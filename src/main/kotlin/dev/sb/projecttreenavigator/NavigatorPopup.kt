@@ -81,7 +81,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         tree.isRootVisible = false
         tree.showsRootHandles = true
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
-        tree.cellRenderer = NavigatorTreeCellRenderer { currentMatcher }
+        tree.cellRenderer = NavigatorTreeCellRenderer(project) { currentMatcher }
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
