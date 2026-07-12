@@ -15,7 +15,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 
 | Key | Action |
 | --- | --- |
-| type | Fuzzy search the whole scope by path, so one query spans folders and file names (`docbui` finds `_DocsExtension/build.gradle.kts`); the left pane shows per entry match counts and grays out the entries with none, the right pane shows the selected entry's matches |
+| type | Fuzzy search the whole scope: one query spans folders and file names (`docbui` finds `_DocsExtension/build.gradle.kts`) and the matched letters are lit up in both panes; the left pane shows per entry match counts and grays out the entries with none, the right pane shows the selected entry's matches |
 | `Alt+J` / `Alt+K` | Move the left pane selection; the right pane refills live |
 | `Ctrl+J` / `Ctrl+K` | Move the right pane selection |
 | `Down` / `Up` | Move the active pane selection; in the preview, scroll one line |
@@ -42,7 +42,16 @@ Movement keys make their pane the active one; `Enter`, zoom and the
 preview follow the pane you last moved. The active pane carries a
 focus colored outline. While a search is running, left pane entries
 with no matches are grayed out and behave as dead rows: movement steps
-over them and they cannot be selected or clicked. Module scope groups Gradle source set modules
+over them and they cannot be selected or clicked.
+
+A query matches a file name loosely, letter by letter, or a path in
+word sized chunks: the letters may jump between folders and the file
+name, but each jump has to land on the start of a word (a folder, a
+camel hump, a part after `_`, `-` or `.`). That is what keeps the
+scattered d, o and c of `adapters/loot/config` from dragging in every
+`build.gradle.kts`. Spell a query with a slash (`api/usrv`) to match
+the path literally. Files whose own name matches rank above files
+matched through their folders. Module scope groups Gradle source set modules
 (`main`, `test` and friends) into one view, so test and resource
 folders show up. File and folder names carry the IDE's VCS status
 colors (modified, added, untracked, ignored) in both panes and in the

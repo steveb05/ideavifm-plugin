@@ -3,6 +3,7 @@ package me.steveb05.projecttreenavigator
 import com.intellij.openapi.project.Project
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.speedSearch.SpeedSearchUtil
 import com.intellij.util.IconUtil
 import com.intellij.util.ui.JBUI
 import java.awt.Color
@@ -12,6 +13,7 @@ import javax.swing.JList
 class NavigatorEntryCellRenderer(
     private val project: Project,
     private val countProvider: (BaseEntry) -> Int? = { null },
+    private val highlightProvider: () -> QueryHighlight? = { null },
 ) : ColoredListCellRenderer<BaseEntry>() {
 
     private val baseLeftInset = ipad.left
@@ -35,20 +37,36 @@ class NavigatorEntryCellRenderer(
             statusColor != null -> SimpleTextAttributes.REGULAR_ATTRIBUTES.derive(-1, statusColor, null, null)
             else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
         }
-        append(value.name, nameAttributes)
+        val highlight = if (count == 0) null else highlightProvider()
+        val fragments =
+            if (value.isDirectory) highlight?.forDirectory(value.file, value.name)
+            else highlight?.forFile(value.file, value.name)
+        if (fragments != null) {
+            SpeedSearchUtil.appendColoredFragments(
+                this,
+                value.name,
+                fragments,
+                nameAttributes,
+                nameAttributes.derive(SimpleTextAttributes.STYLE_SEARCH_MATCH, null, null, null),
+            )
+        } else {
+            append(value.name, nameAttributes)
+        }
         value.parentHint?.let { append("  $it", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES) }
         if (count != null && count > 0) append("  $count", SimpleTextAttributes.GRAYED_BOLD_ATTRIBUTES)
-        if (count != 0 && statusColor != null) restoreForeground(statusColor)
+        if (count != 0 && statusColor != null) restoreForeground(statusColor, value.name.length)
     }
 
     /**
      * A selected row is repainted by the platform with the selection foreground, which drops the VCS status
      * color from the row the user is standing on. Putting it back keeps a changed entry recognizable there.
      */
-    private fun restoreForeground(color: Color) {
+    private fun restoreForeground(color: Color, nameLength: Int) {
         val fragments = iterator()
-        if (!fragments.hasNext()) return
-        fragments.next()
-        fragments.textAttributes = fragments.textAttributes.derive(-1, color, null, null)
+        while (fragments.hasNext()) {
+            fragments.next()
+            if (fragments.offset >= nameLength) return
+            fragments.textAttributes = fragments.textAttributes.derive(-1, color, null, null)
+        }
     }
 }

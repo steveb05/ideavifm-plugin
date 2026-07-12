@@ -15,6 +15,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.text.StringUtil
@@ -25,7 +26,6 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
-import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.ui.DocumentAdapter
@@ -55,6 +55,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     )
 
     private val project = context.project
+    private val searchBase = project.guessProjectDir()
     private val scopes = ScopeResolver.availableScopes(context)
     private var scopeIndex = 0
     private val zoomStack = ArrayDeque<ZoomFrame>()
@@ -64,7 +65,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private val footerLabel = JBLabel()
     private val treePanel = TreePanel(
         project,
-        { currentMatcher },
+        { currentHighlight },
         onActivate = { setActivePane(Pane.RIGHT) },
         onCommit = { commitSelection() },
         onHover = { previewHover(it) },
@@ -76,6 +77,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         onUserSelection = { onUserListSelection() },
         onHover = { previewHover(it) },
         onContextMenu = { component, point -> showContextMenu(component, point) },
+        highlightProvider = { currentHighlight },
     )
     private val previewPanel = PreviewPanel(project)
     private val panel = BorderLayoutPanel()
@@ -88,7 +90,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var activePane = Pane.RIGHT
     private var firstOpen = true
     private var pendingRestore: ZoomFrame? = null
-    private var currentMatcher: MinusculeMatcher? = null
+    private var currentHighlight: QueryHighlight? = null
     private var autoExpandModule = false
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
@@ -286,7 +288,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         autoExpandModule = scope == NavigatorScope.Module && !resolved.fellBack && query.isEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
-            currentMatcher = null
+            currentHighlight = null
             filterMatches = null
             if (scope is NavigatorScope.Named) {
                 showNamedScopeBrowse(scope, resolved)
@@ -418,7 +420,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .expireWith(activePopup)
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { result ->
                 if (gen != generation) return@finishOnUiThread
-                currentMatcher = FileNameSearch.nameMatcher(query)
+                currentHighlight = QueryHighlight(query, searchBase)
                 filterMatches = result.files
                 rootList.setEntries(entries)
                 rootList.setCounts(SubtreeMatches.countsFor(result.files, entries) { it.file })

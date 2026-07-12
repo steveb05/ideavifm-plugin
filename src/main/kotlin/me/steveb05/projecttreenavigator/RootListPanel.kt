@@ -20,6 +20,7 @@ class RootListPanel(
     private val onUserSelection: () -> Unit,
     private val onHover: (VirtualFile) -> Unit = {},
     private val onContextMenu: (JComponent, Point) -> Unit = { _, _ -> },
+    highlightProvider: () -> QueryHighlight? = { null },
 ) {
 
     private val listModel = DefaultListModel<BaseEntry>()
@@ -33,7 +34,8 @@ class RootListPanel(
     init {
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.emptyText.text = "Empty"
-        list.cellRenderer = NavigatorEntryCellRenderer(project) { entry -> counts?.get(entry) }
+        list.cellRenderer =
+            NavigatorEntryCellRenderer(project, { entry -> counts?.get(entry) }, highlightProvider)
         list.addListSelectionListener { e ->
             if (suppressEvents || e.valueIsAdjusting) return@addListSelectionListener
             val index = list.selectedIndex

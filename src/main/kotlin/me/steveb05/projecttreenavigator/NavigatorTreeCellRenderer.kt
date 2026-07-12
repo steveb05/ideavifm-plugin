@@ -3,7 +3,6 @@ package me.steveb05.projecttreenavigator
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.speedSearch.SpeedSearchUtil
@@ -14,7 +13,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 
 class NavigatorTreeCellRenderer(
     private val project: Project,
-    private val matcherProvider: () -> MinusculeMatcher?,
+    private val highlightProvider: () -> QueryHighlight?,
     private val isMarked: (VirtualFile) -> Boolean = { false },
 ) : ColoredTreeCellRenderer() {
 
@@ -42,8 +41,10 @@ class NavigatorTreeCellRenderer(
             if (marked) colored.derive(SimpleTextAttributes.STYLE_BOLD, null, null, null)
             else colored
         if (marked) append("✱ ", plain)
-        val matcher = if (data.isDirectory) null else matcherProvider()
-        val fragments = matcher?.matchingFragments(data.name)
+        val highlight = highlightProvider()
+        val fragments =
+            if (data.isDirectory) highlight?.forDirectory(file, data.name)
+            else highlight?.forFile(file, data.name)
         if (fragments != null) {
             SpeedSearchUtil.appendColoredFragments(
                 this,

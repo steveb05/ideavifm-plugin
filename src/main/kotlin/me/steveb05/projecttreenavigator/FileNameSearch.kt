@@ -19,29 +19,25 @@ class FileNameSearch(private val project: Project) {
     data class Result(val files: List<RankedFile>, val truncated: Boolean)
 
     /**
-     * Matches the query against the path of every file in scope, so a single query can span folders and the
-     * file name: "docbui" finds _DocsExtension/build.gradle.kts. Files whose own name matches outrank files
-     * that only matched through their folders.
+     * A file matches when its name matches the query loosely, letter by letter, or when its path does, which
+     * lets one query span folders and file name ("docbui" finds _DocsExtension/build.gradle.kts). Path
+     * matching keeps the query's letters together in each segment, otherwise the scattered letters of a long
+     * folder chain would match nearly anything. Name matches outrank folder ones.
      */
     fun search(rawQuery: String, scope: GlobalSearchScope, limit: Int = DEFAULT_LIMIT): Result {
         ApplicationManager.getApplication().assertReadAccessAllowed()
         val query = rawQuery.trim().trim('/')
         if (query.isEmpty()) return Result(emptyList(), false)
 
-        val pathMatcher = pathMatcher(query)
-        val nameMatcher = nameMatcher(query)
+        val index = ProjectFileIndex.getInstance(project)
         val base = project.guessProjectDir()
         val ranked = ArrayList<RankedFile>()
 
-        ProjectFileIndex.getInstance(project).iterateContent(
+        index.iterateContent(
             ContentIterator { file ->
                 ProgressManager.checkCanceled()
                 if (file.isDirectory) return@ContentIterator true
-                val path = searchPath(file, base)
-                if (pathMatcher.matches(path)) {
-                    val bonus = if (nameMatcher.matches(file.name)) NAME_MATCH_BONUS else 0
-                    ranked.add(RankedFile(file, pathMatcher.matchingDegree(path) + bonus))
-                }
+                weigh(query, file, searchPath(file, base, index))?.let { ranked.add(RankedFile(file, it)) }
                 true
             },
             VirtualFileFilter { it.isDirectory || scope.contains(it) },
@@ -52,20 +48,44 @@ class FileNameSearch(private val project: Project) {
         return Result(ranked, false)
     }
 
+    /**
+     * A query the user spelled with slashes is taken literally: it has to match the path. A plain query
+     * matches either the file name, loosely letter by letter, or the path in word sized chunks.
+     */
+    private fun weigh(query: String, file: VirtualFile, path: String): Int? {
+        if (query.contains('/')) {
+            val matcher = loosePathMatcher(query)
+            return if (matcher.matches(path)) matcher.matchingDegree(path) else null
+        }
+        val matcher = nameMatcher(query)
+        if (matcher.matches(file.name)) return NAME_MATCH_BONUS + matcher.matchingDegree(file.name)
+        val chunks = PathChunks.match(query, path) ?: return null
+        return -chunks.size * CHUNK_PENALTY - path.length
+    }
+
     companion object {
         const val DEFAULT_LIMIT = 1000
         private const val NAME_MATCH_BONUS = 100_000
+        private const val CHUNK_PENALTY = 1000
 
         fun nameMatcher(query: String): MinusculeMatcher =
-            NameUtil.buildMatcher(fuzzyPattern(query.trim().trim('/').substringAfterLast('/'))).build()
+            NameUtil.buildMatcher(looseLetters(query.trim().trim('/').substringAfterLast('/'))).build()
 
-        fun searchPath(file: VirtualFile, base: VirtualFile?): String =
-            base?.let { VfsUtilCore.getRelativePath(file, it) } ?: file.path
+        /** The path a query is matched against: relative to the project, or to the content root that holds it. */
+        fun searchPath(project: Project, file: VirtualFile): String =
+            searchPath(file, project.guessProjectDir(), ProjectFileIndex.getInstance(project))
 
-        private fun pathMatcher(query: String): MinusculeMatcher =
-            NameUtil.buildMatcher(fuzzyPattern(query)).withSeparators("/").build()
+        private fun searchPath(file: VirtualFile, base: VirtualFile?, index: ProjectFileIndex): String {
+            base?.let { VfsUtilCore.getRelativePath(file, it) }?.let { return it }
+            val root = index.getContentRootForFile(file) ?: return file.name
+            val relative = VfsUtilCore.getRelativePath(file, root) ?: return file.name
+            return "${root.name}/$relative"
+        }
 
-        private fun fuzzyPattern(query: String): String =
+        private fun loosePathMatcher(query: String): MinusculeMatcher =
+            NameUtil.buildMatcher(looseLetters(query)).withSeparators("/").build()
+
+        private fun looseLetters(query: String): String =
             query.toCharArray().joinToString(separator = "*", prefix = "*", postfix = "*")
     }
 }

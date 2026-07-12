@@ -1,6 +1,5 @@
 package me.steveb05.projecttreenavigator
 
-import com.intellij.openapi.project.guessProjectDir
 import com.intellij.psi.search.ProjectScope
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
@@ -17,6 +16,8 @@ class FileNameSearchTest : BasePlatformTestCase() {
         myFixture.addFileToProject("extensions/_DocsExtension/build.gradle.kts", "")
         myFixture.addFileToProject("extensions/VaultExtension/build.gradle.kts", "")
         myFixture.addFileToProject("notes/vault.txt", "")
+        myFixture.addFileToProject("engine/adapters/loot/config/build.gradle.kts", "")
+        myFixture.addFileToProject("engine/content/data/tracker/build.gradle.kts", "")
     }
 
     private fun names(query: String, limit: Int = FileNameSearch.DEFAULT_LIMIT): List<String> =
@@ -24,7 +25,7 @@ class FileNameSearchTest : BasePlatformTestCase() {
 
     private fun paths(query: String): List<String> =
         search.search(query, ProjectScope.getContentScope(project)).files
-            .map { FileNameSearch.searchPath(it.file, project.guessProjectDir()) }
+            .map { FileNameSearch.searchPath(project, it.file) }
 
     fun testFuzzyLowercaseMatch() {
         val names = names("usrv")
@@ -47,6 +48,14 @@ class FileNameSearchTest : BasePlatformTestCase() {
     fun testQuerySpansFolderAndFileName() {
         val paths = paths("docbui")
         assertEquals(listOf("extensions/_DocsExtension/build.gradle.kts"), paths)
+    }
+
+    fun testScatteredLettersInADeepFolderChainDoNotMatch() {
+        val paths = paths("docbui")
+        assertFalse(
+            "d, o and c picked out of unrelated folders must not drag in every build.gradle.kts: $paths",
+            paths.any { it.startsWith("engine/") },
+        )
     }
 
     fun testFolderNameAloneFindsWhatIsInside() {

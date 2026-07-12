@@ -3,7 +3,6 @@ package me.steveb05.projecttreenavigator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.codeStyle.MinusculeMatcher
 import com.intellij.ui.ClientProperty
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollPane
@@ -35,7 +34,7 @@ object PaneBorders {
 
 class TreePanel(
     private val project: Project,
-    matcherProvider: () -> MinusculeMatcher?,
+    highlightProvider: () -> QueryHighlight?,
     private val onActivate: () -> Unit,
     private val onCommit: () -> Unit,
     private val onHover: (VirtualFile) -> Unit = {},
@@ -55,7 +54,7 @@ class TreePanel(
         tree.showsRootHandles = true
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
         tree.toggleClickCount = 0
-        tree.cellRenderer = NavigatorTreeCellRenderer(project, matcherProvider) { it in marked }
+        tree.cellRenderer = NavigatorTreeCellRenderer(project, highlightProvider) { it in marked }
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
