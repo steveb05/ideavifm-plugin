@@ -4,21 +4,15 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ClientProperty
-import com.intellij.ui.ColoredListCellRenderer
-import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.render.RenderingUtil
-import com.intellij.util.IconUtil
-import com.intellij.util.ui.JBUI
-import java.awt.Insets
 import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.DefaultListModel
 import javax.swing.JComponent
-import javax.swing.JList
 import javax.swing.ListSelectionModel
 
 class RootListPanel(
@@ -38,36 +32,7 @@ class RootListPanel(
     init {
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.emptyText.text = "Empty"
-        list.cellRenderer = object : ColoredListCellRenderer<BaseEntry>() {
-            private val baseLeftInset = ipad.left
-
-            override fun customizeCellRenderer(
-                list: JList<out BaseEntry>,
-                value: BaseEntry,
-                index: Int,
-                selected: Boolean,
-                hasFocus: Boolean,
-            ) {
-                ipad = Insets(ipad.top, baseLeftInset + JBUI.scale(16) * value.indent, ipad.bottom, ipad.right)
-                icon = IconUtil.getIcon(value.file, 0, project)
-                val count = counts?.get(value)
-                val statusColor = value.file.takeIf { it.isValid }?.let {
-                    if (value.isDirectory) VcsStatusColor.forDirectory(project, it)
-                    else VcsStatusColor.forFile(project, it)
-                }
-                val nameAttributes = when {
-                    count == 0 -> SimpleTextAttributes.GRAYED_ATTRIBUTES
-                    statusColor != null ->
-                        SimpleTextAttributes.REGULAR_ATTRIBUTES.derive(-1, statusColor, null, null)
-                    else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
-                }
-                append(value.name, nameAttributes)
-                value.parentHint?.let { append("  $it", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES) }
-                if (count != null && count > 0) {
-                    append("  $count", SimpleTextAttributes.GRAYED_BOLD_ATTRIBUTES)
-                }
-            }
-        }
+        list.cellRenderer = NavigatorEntryCellRenderer(project) { entry -> counts?.get(entry) }
         list.addListSelectionListener { e ->
             if (!suppressEvents && !e.valueIsAdjusting) onUserSelection()
         }

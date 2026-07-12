@@ -6,6 +6,8 @@ import com.intellij.openapi.vcs.impl.FileStatusProvider
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.ClientProperty
+import com.intellij.ui.SimpleColoredComponent
+import com.intellij.ui.components.JBList
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.treeStructure.Tree
 import java.awt.Color
@@ -41,6 +43,19 @@ class TreeVcsColorTest : BasePlatformTestCase() {
         }
     }
 
+    fun testChangedFileKeepsItsColorOnTheSelectedLeftPaneRow() {
+        val file = myFixture.addFileToProject("root/entry.kt", "val d = 4\n").virtualFile
+        markModified(file)
+        val list = JBList(listOf(BaseEntry(file, file.name, false)))
+        val renderer = NavigatorEntryCellRenderer(project)
+        renderer.getListCellRendererComponent(list, BaseEntry(file, file.name, false), 0, true, true)
+        assertEquals(
+            "the left pane lands on the file being edited, its color must survive selection",
+            FileStatus.MODIFIED.color,
+            firstColor(renderer),
+        )
+    }
+
     private fun markModified(target: VirtualFile) {
         val provider = FileStatusProvider { file -> if (file == target) FileStatus.MODIFIED else null }
         FileStatusProvider.EP_NAME.getPoint(project).registerExtension(provider, testRootDisposable)
@@ -55,6 +70,10 @@ class TreeVcsColorTest : BasePlatformTestCase() {
         val node = DefaultMutableTreeNode(NavigatorNodeData(file, file.name, false))
         val renderer = NavigatorTreeCellRenderer(project, { null })
         renderer.getTreeCellRendererComponent(tree, node, selected, false, true, 0, selected)
+        return firstColor(renderer)
+    }
+
+    private fun firstColor(renderer: SimpleColoredComponent): Color? {
         val fragments = renderer.iterator()
         while (fragments.hasNext()) {
             fragments.next()

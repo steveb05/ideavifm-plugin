@@ -3,27 +3,36 @@ package me.steveb05.projecttreenavigator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.FileStatusManager
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.ThreeState
 import java.awt.Color
 
 object VcsStatusColor {
 
-    fun forFile(project: Project, file: VirtualFile): Color? =
-        colorOf(FileStatusManager.getInstance(project).getStatus(file))
+    private val UNCHANGED = setOf(
+        FileStatus.NOT_CHANGED,
+        FileStatus.NOT_CHANGED_IMMEDIATE,
+        FileStatus.NOT_CHANGED_RECURSIVE,
+    )
 
-    fun forDirectory(project: Project, dir: VirtualFile): Color? =
-        colorOf(FileStatusManager.getInstance(project).getRecursiveStatus(dir))
+    fun forFile(project: Project, file: VirtualFile): Color? =
+        colorFor(FileStatusManager.getInstance(project).getStatus(file), containsChanges = false)
+
+    fun forDirectory(project: Project, dir: VirtualFile): Color? = colorFor(
+        FileStatusManager.getInstance(project).getStatus(dir),
+        containsChanges(ChangeListManager.getInstance(project).haveChangesUnder(dir)),
+    )
 
     /**
-     * A clean directory that contains changes reports NOT_CHANGED_IMMEDIATE (a changed file sits directly
-     * in it) or NOT_CHANGED_RECURSIVE (the changes are deeper). Both mean "contains changes", and both
-     * leave their scheme color undefined unless the user sets one, so they fall back to the modified color.
+     * haveChangesUnder answers YES when the directory is the immediate parent of a changed file and UNSURE
+     * when the changes sit deeper, so every folder up to the root of the change is clean only on NO.
      */
-    fun colorOf(status: FileStatus): Color? = when (status) {
-        FileStatus.NOT_CHANGED -> null
-        FileStatus.NOT_CHANGED_IMMEDIATE, FileStatus.NOT_CHANGED_RECURSIVE ->
-            status.color ?: FileStatus.MODIFIED.color
+    fun containsChanges(state: ThreeState): Boolean = state != ThreeState.NO
 
-        else -> status.color
+    /** A clean folder holding changes borrows the modified color; anything with a status of its own keeps it. */
+    fun colorFor(status: FileStatus, containsChanges: Boolean): Color? {
+        if (status !in UNCHANGED) return status.color
+        return FileStatus.MODIFIED.color.takeIf { containsChanges }
     }
 }
