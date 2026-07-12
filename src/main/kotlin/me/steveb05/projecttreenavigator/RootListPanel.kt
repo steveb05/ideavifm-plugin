@@ -12,6 +12,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.DefaultListModel
+import javax.swing.DefaultListSelectionModel
 import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 
@@ -27,24 +28,22 @@ class RootListPanel(
     private val list = JBList(listModel)
     private var counts: Map<BaseEntry, Int>? = null
     private var suppressEvents = false
-    private var lastSelectableIndex = -1
 
     val component: JComponent = JBScrollPane(list)
 
     init {
+        list.selectionModel = object : DefaultListSelectionModel() {
+            override fun setSelectionInterval(index0: Int, index1: Int) {
+                if (suppressEvents || isSelectable(index1)) super.setSelectionInterval(index0, index1)
+            }
+        }
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        list.isFocusable = false
         list.emptyText.text = "Empty"
         list.cellRenderer =
             NavigatorEntryCellRenderer(project, { entry -> counts?.get(entry) }, highlightProvider)
         list.addListSelectionListener { e ->
-            if (suppressEvents || e.valueIsAdjusting) return@addListSelectionListener
-            val index = list.selectedIndex
-            if (index >= 0 && !isSelectable(index)) {
-                selectIndex(lastSelectableIndex)
-                return@addListSelectionListener
-            }
-            lastSelectableIndex = index
-            onUserSelection()
+            if (!suppressEvents && !e.valueIsAdjusting) onUserSelection()
         }
         list.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseMoved(e: MouseEvent) {
@@ -101,7 +100,6 @@ class RootListPanel(
     fun selectIndex(index: Int) {
         if (listModel.isEmpty) return
         val coerced = index.coerceIn(0, listModel.size() - 1)
-        lastSelectableIndex = coerced
         suppressed {
             list.selectedIndex = coerced
             list.ensureIndexIsVisible(coerced)
@@ -135,7 +133,11 @@ class RootListPanel(
         selectIndex(target)
     }
 
-    private fun isSelectable(index: Int): Boolean = counts?.get(listModel.getElementAt(index)) != 0
+    /** A search grays out the entries it found nothing in; those rows are dead and cannot take a selection. */
+    private fun isSelectable(index: Int): Boolean {
+        if (index < 0 || index >= listModel.size()) return false
+        return counts?.get(listModel.getElementAt(index)) != 0
+    }
 
     private inline fun suppressed(block: () -> Unit) {
         suppressEvents = true

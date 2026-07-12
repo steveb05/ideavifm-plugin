@@ -173,6 +173,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
+        commands.bind(NavigatorCommand.FOCUS_SEARCH) { focusSearch() }
         commands.bind(NavigatorCommand.TOGGLE_MARK, isEnabled = { activePane == Pane.RIGHT }) {
             toggleMark()
         }
@@ -572,6 +573,13 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 true,
             )
             .show(RelativePoint(component, point))
+    }
+
+    /** The panes never take focus, but the preview editor can, and then typing would go into it. */
+    private fun focusSearch() {
+        val editor = searchField.textEditor
+        editor.requestFocusInWindow()
+        editor.caretPosition = editor.document.length
     }
 
     private fun toggleMark() {

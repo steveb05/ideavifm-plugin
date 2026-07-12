@@ -27,6 +27,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Alt+P` | Toggle the preview pane |
 | `Ctrl+Period` | Toggle dot file hiding |
 | `Alt+C` | Toggle showing only files with VCS changes |
+| `Ctrl+F` | Put the caret back in the search field |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | The IDE New menu for the selected folder (file templates included) |
@@ -40,9 +41,12 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 
 Movement keys make their pane the active one; `Enter`, zoom and the
 preview follow the pane you last moved. The active pane carries a
-focus colored outline. While a search is running, left pane entries
-with no matches are grayed out and behave as dead rows: movement steps
-over them and they cannot be selected or clicked.
+focus colored outline. Neither pane takes keyboard focus, so the caret
+stays in the search field and you can keep typing after clicking a row;
+`Ctrl+F` brings it back if the preview editor took it. While a search
+is running, left pane entries with no matches are grayed out and behave
+as dead rows: movement steps over them and they cannot be selected or
+clicked.
 
 A query matches a file name loosely, letter by letter, or a path in
 word sized chunks: the letters may jump between folders and the file

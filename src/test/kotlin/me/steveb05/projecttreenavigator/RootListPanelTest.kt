@@ -71,6 +71,14 @@ class RootListPanelTest : BasePlatformTestCase() {
         assertEquals(1, fired)
     }
 
+    fun testThePaneNeverStealsFocusFromTheSearchField() {
+        val panel = RootListPanel(project, onUserSelection = { })
+        assertFalse(
+            "clicking a row must not move the caret out of the search field",
+            listInside(panel).isFocusable,
+        )
+    }
+
     private fun threeEntries(): List<BaseEntry> {
         myFixture.addFileToProject("one/x.txt", "")
         myFixture.addFileToProject("two/y.txt", "")

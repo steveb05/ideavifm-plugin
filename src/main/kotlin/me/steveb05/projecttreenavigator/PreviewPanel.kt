@@ -44,6 +44,18 @@ class PreviewPanel(private val project: Project) {
     private var generation = 0
     private var target: VirtualFile? = null
 
+    /**
+     * Building a viewer costs an editor and a highlighting pass, which is what makes scrolling through files
+     * feel heavy. The last few stay alive so walking back over them is free.
+     */
+    private val recentEditors = object : LinkedHashMap<VirtualFile, EditorEx>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<VirtualFile, EditorEx>): Boolean {
+            if (size <= MAX_CACHED_EDITORS) return false
+            EditorFactory.getInstance().releaseEditor(eldest.value)
+            return true
+        }
+    }
+
     val component: JComponent = panel
 
     init {
@@ -54,7 +66,7 @@ class PreviewPanel(private val project: Project) {
     fun attach(popup: JBPopup) {
         this.popup = popup
         alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, popup)
-        Disposer.register(popup) { releaseEditor() }
+        Disposer.register(popup) { releaseEditors() }
         showLabel("No preview")
     }
 
@@ -63,7 +75,7 @@ class PreviewPanel(private val project: Project) {
         target = file
         val activeAlarm = alarm ?: return
         activeAlarm.cancelAllRequests()
-        activeAlarm.addRequest({ load(file) }, 150)
+        activeAlarm.addRequest({ load(file) }, LOAD_DELAY_MS)
     }
 
     fun setActive(active: Boolean) {
@@ -112,13 +124,19 @@ class PreviewPanel(private val project: Project) {
     }
 
     private fun apply(content: Content, file: VirtualFile) {
-        releaseEditor()
+        detachEditor()
         panel.removeAll()
         scrollable = null
         when (content) {
-            is Content.Source -> installEditor(sourceViewer(project, file, content.document), truncated = false)
+            is Content.Source -> installEditor(
+                viewerFor(file) { sourceViewer(project, file, content.document) },
+                truncated = false,
+            )
 
-            is Content.Text -> installEditor(textViewer(project, file, content.text), content.truncated)
+            is Content.Text -> installEditor(
+                viewerFor(file) { textViewer(project, file, content.text) },
+                content.truncated,
+            )
 
             is Content.Binary -> showCentered(
                 "<html><center>${StringUtil.escapeXmlEntities(content.name)}<br>" +
@@ -152,6 +170,9 @@ class PreviewPanel(private val project: Project) {
         return "<span style=\"color:#${ColorUtil.toHex(color)}\">$name</span>"
     }
 
+    private fun viewerFor(file: VirtualFile, create: () -> EditorEx): EditorEx =
+        recentEditors.getOrPut(file, create)
+
     private fun installEditor(created: EditorEx, truncated: Boolean) {
         editor = created
         panel.addToCenter(created.component)
@@ -163,7 +184,7 @@ class PreviewPanel(private val project: Project) {
     }
 
     private fun showLabel(text: String) {
-        releaseEditor()
+        detachEditor()
         panel.removeAll()
         scrollable = null
         showCentered(text)
@@ -176,8 +197,15 @@ class PreviewPanel(private val project: Project) {
         panel.addToCenter(label)
     }
 
-    private fun releaseEditor() {
-        editor?.let { EditorFactory.getInstance().releaseEditor(it) }
+    /** The mounted viewer goes back to the cache, which owns it until the popup closes. */
+    private fun detachEditor() {
+        editor = null
+    }
+
+    private fun releaseEditors() {
+        val factory = EditorFactory.getInstance()
+        recentEditors.values.forEach { factory.releaseEditor(it) }
+        recentEditors.clear()
         editor = null
     }
 
@@ -185,6 +213,8 @@ class PreviewPanel(private val project: Project) {
         const val MAX_BYTES = 100 * 1024
         const val MAX_LINES = 300
         const val MAX_DIR_ENTRIES = 100
+        const val LOAD_DELAY_MS = 250
+        const val MAX_CACHED_EDITORS = 4
 
         /**
          * Viewer over the file's own document. The document carries a PSI file, which is what lets the

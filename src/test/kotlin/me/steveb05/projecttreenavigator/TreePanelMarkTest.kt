@@ -1,6 +1,8 @@
 package me.steveb05.projecttreenavigator
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.ui.components.JBScrollPane
+import javax.swing.JTree
 
 class TreePanelMarkTest : BasePlatformTestCase() {
 
@@ -11,6 +13,12 @@ class TreePanelMarkTest : BasePlatformTestCase() {
         myFixture.addFileToProject("root/c.txt", "")
         panel.showSubtree(myFixture.findFileInTempDir("root"))
         return panel
+    }
+
+    fun testThePaneNeverStealsFocusFromTheSearchField() {
+        val panel = panelOverRoot()
+        val tree = (panel.component as JBScrollPane).viewport.view as JTree
+        assertFalse("clicking a row must not move the caret out of the search field", tree.isFocusable)
     }
 
     fun testMarkingAdvancesAndAccumulates() {

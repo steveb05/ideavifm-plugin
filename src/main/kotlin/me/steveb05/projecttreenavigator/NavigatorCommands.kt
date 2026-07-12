@@ -23,6 +23,7 @@ enum class NavigatorCommand(val actionId: String) {
     TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles"),
     TOGGLE_CHANGED("ProjectTreeNavigator.ToggleChangedOnly"),
     TOGGLE_MARK("ProjectTreeNavigator.ToggleMark"),
+    FOCUS_SEARCH("ProjectTreeNavigator.FocusSearch"),
     NEW_ELEMENT(NavigatorFileActions.NEW_ELEMENT),
     PREVIEW_LINE_DOWN("ProjectTreeNavigator.PreviewLineDown"),
     PREVIEW_LINE_UP("ProjectTreeNavigator.PreviewLineUp"),
