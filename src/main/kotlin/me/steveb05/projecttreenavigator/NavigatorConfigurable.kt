@@ -33,11 +33,12 @@ class NavigatorConfigurable : BoundConfigurable("Project Tree Navigator") {
             checkBox("Show preview pane").bindSelected(settings::showPreview)
         }
         row {
-            checkBox("Open on the last scope and zoom instead of the current file")
+            checkBox("Open on the last scope and zoom")
                 .bindSelected(settings::restoreLastView)
                 .comment(
-                    "Off: the popup opens on the file you are editing. " +
-                        "On: it opens where you left it, scope, zoom and selection.",
+                    "Off: the popup opens in Project scope with no zoom. On: the scope and zoom come back " +
+                        "as you left them. Either way it lands on the file you are editing, falling back to " +
+                        "what you were last looking at.",
                 )
         }
         row {

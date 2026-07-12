@@ -47,8 +47,10 @@ stays in the search field and you can keep typing after clicking a row;
 left pane loops around the ends of the list. While a search is running,
 left pane entries with no matches are grayed out and behave as dead
 rows: movement steps over them and they cannot be selected or clicked.
-Clearing the query puts the right pane back the way it opens, expanded
-down to the first level that holds files.
+Clearing the query puts the panes back the way they open: the tree walks
+open down to the file you are editing. Without a file to land on it
+falls back to the entry the view was left on, then to the one that was
+already selected.
 
 A query matches a file name loosely, letter by letter, or a path in
 word sized chunks: the letters may jump between folders and the file
@@ -85,10 +87,9 @@ tree is rebuilt (new query, scope, zoom) or once an operation finishes.
 Settings, Tools, Project Tree Navigator: hide dot files (default on),
 compact folder chains (default on), left pane children of top level
 folders with or without loose files (default on), preview pane
-(default off), and what the popup opens on (default the file you are
-editing; turn on "Open on the last scope and zoom" to have it come back
-where you left it instead, remembering the scope, the zoom and the
-selection per project). The navigator specific commands appear with their
+(default off), and whether the popup opens on the last scope and zoom
+(default off, so it opens in Project scope with no zoom; the scope, the
+zoom and the selection are remembered per project either way). The navigator specific commands appear with their
 default shortcuts in Settings, Keymap under "Project Tree Navigator";
 assignments there win, and removing a shortcut in the keymap disables
 it in the popup. New, rename, move, cut, copy, paste and delete are the

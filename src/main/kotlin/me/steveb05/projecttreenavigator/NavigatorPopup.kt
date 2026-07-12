@@ -95,6 +95,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var autoExpand = false
     private var restoredEntry: VirtualFile? = null
     private var restoredFile: VirtualFile? = null
+    private var searchWasActive = false
+    private var searchCleared = false
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private var changedOnly = false
@@ -309,6 +311,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
         autoExpand = query.isEmpty()
+        searchCleared = query.isEmpty() && searchWasActive
+        searchWasActive = query.isNotEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
             currentHighlight = null
@@ -338,8 +342,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val restore = pendingRestore
         pendingRestore = null
         val current = context.currentFile?.takeIf { it.isValid }
-        val remembered = restoredEntry
-        restoredEntry = null
+        val opening = firstOpen || searchCleared
+        searchCleared = false
         when {
             restore != null -> {
                 rootList.selectIndex(restore.leftIndex)
@@ -348,27 +352,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 setActivePane(restore.pane)
             }
 
-            firstOpen && remembered != null -> {
-                val entry = entries.firstOrNull { it.file == remembered }
-                if (entry == null) rootList.selectIndex(0) else rootList.selectEntry(entry)
-                rebuildRight()
-                val base = rootList.selectedEntry()?.file
-                val file = restoredFile?.takeIf { it.isValid }
-                if (base != null && file != null && VfsUtilCore.isAncestor(base, file, true)) {
-                    treePanel.locate(file, base)
-                }
-            }
-
-            firstOpen && current != null -> {
-                val containing = rootList.entryContaining(current)
-                if (containing == null) rootList.selectIndex(0) else rootList.selectEntry(containing)
-                rebuildRight()
-                when {
-                    containing == null -> Unit
-                    containing.file == current -> setActivePane(Pane.LEFT)
-                    else -> treePanel.locate(current, containing.file)
-                }
-            }
+            opening -> positionOnOpen(entries, current, previous)
 
             else -> {
                 val kept = previous?.let { p -> entries.firstOrNull { it.file == p.file } }
@@ -382,6 +366,35 @@ class NavigatorPopup(private val context: NavigatorContext) {
             }
         }
         firstOpen = false
+    }
+
+    /**
+     * Opening the popup and clearing a search have to leave the same view: the tree walked open down to the
+     * file being edited. Without a file to land on it falls back to the view that was remembered, then to
+     * whatever was already selected.
+     */
+    private fun positionOnOpen(entries: List<BaseEntry>, current: VirtualFile?, previous: BaseEntry?) {
+        val remembered = restoredEntry
+        val rememberedFile = restoredFile
+        restoredEntry = null
+        restoredFile = null
+
+        val target = OpenTarget.choose(entries, current, remembered, previous)
+        if (target == null) {
+            rootList.selectIndex(0)
+            rebuildRight()
+            return
+        }
+        rootList.selectEntry(target)
+        rebuildRight()
+
+        val land = current?.takeIf { VfsUtilCore.isAncestor(target.file, it, false) }
+            ?: rememberedFile?.takeIf { it.isValid && VfsUtilCore.isAncestor(target.file, it, true) }
+        when {
+            land == null -> Unit
+            land == target.file -> setActivePane(Pane.LEFT)
+            else -> treePanel.locate(land, target.file)
+        }
     }
 
     private fun restoreRightSelection(frame: ZoomFrame) {
