@@ -29,7 +29,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Alt+C` | Toggle showing only files with VCS changes |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
-| `Alt+Insert` | Open the IDE New menu for the selected folder (file templates included) |
+| `Alt+Insert` | The IDE New menu for the selected folder (file templates included) |
 | `Space` (empty query) or `Alt+M` | Mark or unmark the row; marked rows are bold and survive navigation |
 | `Shift+F6` / `F6` | Rename / move the target (IDE refactoring, references are updated) |
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy, cut, paste files (empty query; paste falls back to text when the clipboard holds no files) |
@@ -63,9 +63,10 @@ folders with or without loose files (default on), preview pane
 (default off). The navigator specific commands appear with their
 default shortcuts in Settings, Keymap under "Project Tree Navigator";
 assignments there win, and removing a shortcut in the keymap disables
-it in the popup. Rename, move, cut, copy, paste and delete follow the
-shortcuts you already have for those IDE actions, so remapping them in
-the keymap changes them in the popup too.
+it in the popup. New, rename, move, cut, copy, paste and delete are the
+IDE actions themselves, so they follow the shortcuts you already have
+for them and remapping them in the keymap changes them in the popup
+too.
 
 Custom scopes defined in Settings, Appearance and Behavior, Scopes appear
 as extra chips after Folder.

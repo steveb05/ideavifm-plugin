@@ -12,6 +12,7 @@ import com.intellij.openapi.actionSystem.ex.ActionUtil
 object NavigatorFileActions {
 
     const val NEW = "NewGroup"
+    const val NEW_ELEMENT = "NewElement"
     const val RENAME = "RenameElement"
     const val MOVE = "Move"
     const val DELETE = "\$Delete"

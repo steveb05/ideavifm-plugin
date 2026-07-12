@@ -3,8 +3,6 @@ package me.steveb05.projecttreenavigator
 import com.intellij.ide.CopyPasteDelegator
 import com.intellij.ide.IdeView
 import com.intellij.ide.PsiCopyPasteManager
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.LangDataKeys
@@ -557,11 +555,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun showNewElement() {
-        val group = ActionManager.getInstance().getAction(NavigatorFileActions.NEW) as? ActionGroup ?: return
         val dataContext = fileActionContext() ?: return
-        JBPopupFactory.getInstance()
-            .createActionGroupPopup("New", group, dataContext, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, false)
-            .showInCenterOf(panel)
+        NavigatorFileActions.perform(NavigatorFileActions.NEW_ELEMENT, dataContext) { }
     }
 
     private fun showContextMenu(component: JComponent, point: Point) {
@@ -607,15 +602,19 @@ class NavigatorPopup(private val context: NavigatorContext) {
         return selected.filter { it.isValid }
     }
 
-    private fun targetElements(): Array<PsiElement> {
-        val manager = PsiManager.getInstance(project)
-        val elements: List<PsiElement> = targetFiles().mapNotNull {
-            if (it.isDirectory) manager.findDirectory(it) else manager.findFile(it)
+    private fun targetElements(): Array<PsiElement> =
+        ReadAction.compute<Array<PsiElement>, RuntimeException> {
+            val manager = PsiManager.getInstance(project)
+            val elements: List<PsiElement> = targetFiles().mapNotNull {
+                if (it.isDirectory) manager.findDirectory(it) else manager.findFile(it)
+            }
+            elements.toTypedArray()
         }
-        return elements.toTypedArray()
-    }
 
-    private fun fileActionContext(): DataContext? {
+    private fun fileActionContext(): DataContext? =
+        ReadAction.compute<DataContext?, RuntimeException> { buildFileActionContext() }
+
+    private fun buildFileActionContext(): DataContext? {
         val dir = createTargetDirectory() ?: return null
         val psiDir = PsiManager.getInstance(project).findDirectory(dir) ?: return null
         val files = targetFiles()

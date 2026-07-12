@@ -69,10 +69,6 @@
                     text="Navigator: Toggle Mark" description="Mark or unmark the selected navigator row for a bulk operation">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt M"/>
             </action>
-            <action id="ProjectTreeNavigator.NewElement" class="me.steveb05.projecttreenavigator.NavigatorCommandStubAction"
-                    text="Navigator: New" description="Open the IDE New menu for the selected navigator folder">
-                <keyboard-shortcut keymap="$default" first-keystroke="alt INSERT"/>
-            </action>
             <action id="ProjectTreeNavigator.PreviewLineDown" class="me.steveb05.projecttreenavigator.NavigatorCommandStubAction"
                     text="Navigator: Preview Line Down" description="Scroll the navigator preview down one line">
                 <keyboard-shortcut keymap="$default" first-keystroke="control E"/>

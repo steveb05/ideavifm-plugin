@@ -11,6 +11,7 @@ class NavigatorFileActionsTest : BasePlatformTestCase() {
         val manager = ActionManager.getInstance()
         val ids = listOf(
             NavigatorFileActions.NEW,
+            NavigatorFileActions.NEW_ELEMENT,
             NavigatorFileActions.RENAME,
             NavigatorFileActions.MOVE,
             NavigatorFileActions.DELETE,
