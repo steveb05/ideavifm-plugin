@@ -1,22 +1,29 @@
 package me.steveb05.projecttreenavigator
 
 import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class PreviewContentTest : BasePlatformTestCase() {
 
-    fun testTextContent() {
+    fun testTextContentUsesThePsiBackedDocument() {
         myFixture.addFileToProject("root/hello.txt", "line one\nline two")
         val file = myFixture.findFileInTempDir("root/hello.txt")
-        val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Text
-        assertEquals("line one\nline two", content.text)
-        assertFalse(content.truncated)
+        val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Source
+        assertSame(FileDocumentManager.getInstance().getDocument(file), content.document)
+        assertEquals("line one\nline two", content.document.text)
+        assertNotNull(
+            "the preview document must resolve to a PSI file or the code analyzer cannot highlight it",
+            PsiDocumentManager.getInstance(project).getPsiFile(content.document),
+        )
     }
 
-    fun testTextTruncatedByLines() {
-        val body = (1..400).joinToString("\n") { "line $it" }
+    fun testOversizedFileFallsBackToTruncatedText() {
+        val body = (1..4000).joinToString("\n") { "line $it padded to widen the file a little" }
         myFixture.addFileToProject("root/long.txt", body)
         val file = myFixture.findFileInTempDir("root/long.txt")
+        assertTrue("test file must exceed the preview cap", file.length > PreviewPanel.MAX_BYTES)
         val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Text
         assertTrue(content.truncated)
         assertEquals(PreviewPanel.MAX_LINES, content.text.lines().size)

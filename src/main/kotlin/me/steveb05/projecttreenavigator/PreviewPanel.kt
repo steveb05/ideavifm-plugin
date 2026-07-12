@@ -2,9 +2,11 @@ package me.steveb05.projecttreenavigator
 
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.util.Disposer
@@ -25,6 +27,7 @@ import javax.swing.SwingConstants
 class PreviewPanel(private val project: Project) {
 
     sealed class Content {
+        class Source(val document: Document) : Content()
         class Text(val text: String, val truncated: Boolean) : Content()
         class Binary(val name: String, val typeName: String, val length: Long) : Content()
         class Directory(val names: List<String>, val capped: Boolean) : Content()
@@ -112,30 +115,9 @@ class PreviewPanel(private val project: Project) {
         panel.removeAll()
         scrollable = null
         when (content) {
-            is Content.Text -> {
-                val factory = EditorFactory.getInstance()
-                val document = factory.createDocument(content.text)
-                document.setReadOnly(true)
-                val created = factory.createViewer(document, project) as EditorEx
-                created.highlighter =
-                    EditorHighlighterFactory.getInstance().createEditorHighlighter(project, file)
-                created.settings.apply {
-                    isLineNumbersShown = false
-                    isFoldingOutlineShown = false
-                    isLineMarkerAreaShown = false
-                    isIndentGuidesShown = false
-                    isCaretRowShown = false
-                    additionalLinesCount = 0
-                }
-                editor = created
-                panel.addToCenter(created.component)
-                scrollable = created.scrollPane
-                if (content.truncated) {
-                    val note = JBLabel("Preview truncated")
-                    note.border = JBUI.Borders.empty(2, 8)
-                    panel.addToBottom(note)
-                }
-            }
+            is Content.Source -> installEditor(sourceViewer(project, file, content.document), truncated = false)
+
+            is Content.Text -> installEditor(textViewer(project, file, content.text), content.truncated)
 
             is Content.Binary -> showCentered(
                 "<html><center>${StringUtil.escapeXmlEntities(content.name)}<br>" +
@@ -158,6 +140,16 @@ class PreviewPanel(private val project: Project) {
         }
         panel.revalidate()
         panel.repaint()
+    }
+
+    private fun installEditor(created: EditorEx, truncated: Boolean) {
+        editor = created
+        panel.addToCenter(created.component)
+        scrollable = created.scrollPane
+        if (!truncated) return
+        val note = JBLabel("Preview truncated")
+        note.border = JBUI.Borders.empty(2, 8)
+        panel.addToBottom(note)
     }
 
     private fun showLabel(text: String) {
@@ -184,6 +176,37 @@ class PreviewPanel(private val project: Project) {
         const val MAX_LINES = 300
         const val MAX_DIR_ENTRIES = 100
 
+        /**
+         * Viewer over the file's own document. The document carries a PSI file, which is what lets the
+         * code analyzer contribute semantic colors (soft keywords, annotations, declarations) on top of
+         * the lexer colors.
+         */
+        fun sourceViewer(project: Project, file: VirtualFile, document: Document): EditorEx =
+            configure(EditorFactory.getInstance().createEditor(document, project, file, true) as EditorEx, project, file)
+
+        /** Viewer over a detached copy of the text, used when the file is too large to preview in full. */
+        fun textViewer(project: Project, file: VirtualFile, text: String): EditorEx {
+            val factory = EditorFactory.getInstance()
+            val document = factory.createDocument(text)
+            document.setReadOnly(true)
+            return configure(factory.createViewer(document, project) as EditorEx, project, file)
+        }
+
+        private fun configure(created: EditorEx, project: Project, file: VirtualFile): EditorEx {
+            created.setFile(file)
+            created.highlighter =
+                EditorHighlighterFactory.getInstance().createEditorHighlighter(project, file)
+            created.settings.apply {
+                isLineNumbersShown = false
+                isFoldingOutlineShown = false
+                isLineMarkerAreaShown = false
+                isIndentGuidesShown = false
+                isCaretRowShown = false
+                additionalLinesCount = 0
+            }
+            return created
+        }
+
         fun computeContent(project: Project, file: VirtualFile): Content {
             if (!file.isValid) return Content.Empty
             if (file.isDirectory) {
@@ -191,6 +214,9 @@ class PreviewPanel(private val project: Project) {
                 return Content.Directory(names.take(MAX_DIR_ENTRIES), names.size > MAX_DIR_ENTRIES)
             }
             if (file.fileType.isBinary) return Content.Binary(file.name, file.fileType.name, file.length)
+            if (file.length <= MAX_BYTES) {
+                FileDocumentManager.getInstance().getDocument(file)?.let { return Content.Source(it) }
+            }
             val bytes = try {
                 file.inputStream.use { it.readNBytes(MAX_BYTES + 1) }
             } catch (e: IOException) {

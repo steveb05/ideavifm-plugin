@@ -2,8 +2,8 @@ package me.steveb05.projecttreenavigator
 
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.ex.EditorEx
-import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.tree.IElementType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
@@ -26,17 +26,30 @@ class PreviewHighlightTest : BasePlatformTestCase() {
         assertTrue("expected colored attributes for kotlin", result.colored)
     }
 
+    fun testPreviewEditorCarriesTheFileSoTheAnalyzerCanRun() {
+        myFixture.addFileToProject("root/annotated.kt", "@Deprecated(\"x\")\nprivate val answer = 42\n")
+        val file = myFixture.findFileInTempDir("root/annotated.kt")
+        val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Source
+        val viewer = viewerFor(content, file)
+        try {
+            assertEquals(file, viewer.virtualFile)
+            assertTrue(viewer.isViewer)
+            assertTrue("the shared document must not be marked read only", content.document.isWritable)
+            assertNotNull(PsiDocumentManager.getInstance(project).getPsiFile(content.document))
+        } finally {
+            EditorFactory.getInstance().releaseEditor(viewer)
+        }
+    }
+
     private class LexResult(val tokenTypes: Set<IElementType>, val colored: Boolean)
 
+    private fun viewerFor(content: PreviewPanel.Content.Source, file: VirtualFile): EditorEx =
+        PreviewPanel.sourceViewer(project, file, content.document)
+
     private fun lexPreview(file: VirtualFile): LexResult {
-        val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Text
-        val factory = EditorFactory.getInstance()
-        val document = factory.createDocument(content.text)
-        document.setReadOnly(true)
-        val viewer = factory.createViewer(document, project) as EditorEx
+        val content = PreviewPanel.computeContent(project, file) as PreviewPanel.Content.Source
+        val viewer = viewerFor(content, file)
         try {
-            viewer.highlighter =
-                EditorHighlighterFactory.getInstance().createEditorHighlighter(project, file)
             val types = mutableSetOf<IElementType>()
             var colored = false
             val iterator = viewer.highlighter.createIterator(0)
@@ -50,7 +63,7 @@ class PreviewHighlightTest : BasePlatformTestCase() {
             }
             return LexResult(types, colored)
         } finally {
-            factory.releaseEditor(viewer)
+            EditorFactory.getInstance().releaseEditor(viewer)
         }
     }
 }

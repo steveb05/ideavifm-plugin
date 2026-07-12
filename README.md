@@ -47,6 +47,12 @@ colors (modified, added, untracked, ignored), and folders containing
 changes are tinted like modified files; `Alt+C` narrows both panes to
 changed files only, composing with search, scopes and zoom.
 
+The preview opens the file's own document, so it gets the same colors
+as the editor: the lexer keywords plus everything the code analyzer
+contributes (soft keywords such as `private`, annotations, declarations
+and references). Files over 100 KB fall back to a truncated, lexer only
+preview.
+
 File operations delegate to the IDE, so renaming a class file runs the
 rename refactoring and moving updates imports. They act on the marked
 rows if there are any, otherwise on the row under the cursor, which is
