@@ -198,6 +198,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
         commands.bind(NavigatorCommand.FOCUS_SEARCH) { focusSearch() }
+        commands.bind(NavigatorCommand.RESET_TREE, isEnabled = { searchField.text.isEmpty() }) {
+            treePanel.resetToOpenState()
+        }
         commands.bind(NavigatorCommand.TOGGLE_MARK, isEnabled = { activePane == Pane.RIGHT }) {
             toggleMark()
         }

@@ -156,6 +156,13 @@ class TreePanel(
 
     fun expandTopLevel() = TreeUtil.expand(tree, 1)
 
+    /** Collapses the tree and opens it again the way it looks when the popup opens. */
+    fun resetToOpenState() {
+        TreeUtil.collapseAll(tree, 0)
+        expandToFirstFileLevel()
+        if (tree.rowCount > 0) tree.setSelectionRow(0)
+    }
+
     fun move(delta: Int) {
         val rowCount = tree.rowCount
         if (rowCount == 0) return

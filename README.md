@@ -28,6 +28,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Ctrl+Period` | Toggle dot file hiding |
 | `Alt+C` | Toggle showing only files with VCS changes |
 | `Ctrl+F` | Put the caret back in the search field |
+| `Alt+R` | Collapse the tree back to how it opens, open down to the first folders holding files |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | The IDE New menu for the selected folder (file templates included) |

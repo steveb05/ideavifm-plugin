@@ -65,6 +65,10 @@
                     text="Navigator: Toggle Changed Files Only" description="Show only files with VCS changes in the navigator">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt C"/>
             </action>
+            <action id="ProjectTreeNavigator.ResetTree" class="me.steveb05.projecttreenavigator.NavigatorCommandStubAction"
+                    text="Navigator: Collapse Tree" description="Collapse the navigator tree back to how it opens">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt R"/>
+            </action>
             <action id="ProjectTreeNavigator.FocusSearch" class="me.steveb05.projecttreenavigator.NavigatorCommandStubAction"
                     text="Navigator: Focus Search Field" description="Put the caret back in the navigator search field">
                 <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
