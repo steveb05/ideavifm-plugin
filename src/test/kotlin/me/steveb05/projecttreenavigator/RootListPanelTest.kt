@@ -1,6 +1,8 @@
 package me.steveb05.projecttreenavigator
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.ui.components.JBScrollPane
+import javax.swing.JList
 
 class RootListPanelTest : BasePlatformTestCase() {
 
@@ -41,6 +43,47 @@ class RootListPanelTest : BasePlatformTestCase() {
         panel.setEntries(entries)
         assertEquals(entries[1], panel.entryContaining(file))
     }
+
+    fun testMovementStepsOverEntriesWithoutMatches() {
+        val panel = RootListPanel(project, onUserSelection = { })
+        val entries = threeEntries()
+        panel.setEntries(entries)
+        panel.setCounts(mapOf(entries[0] to 2, entries[1] to 0, entries[2] to 1))
+        panel.selectIndex(0)
+        panel.move(1)
+        assertEquals("the grayed out entry is skipped", 2, panel.selectedIndex())
+        panel.move(-1)
+        assertEquals(0, panel.selectedIndex())
+    }
+
+    fun testEntryWithoutMatchesCannotBeClicked() {
+        var fired = 0
+        val panel = RootListPanel(project, onUserSelection = { fired++ })
+        val entries = threeEntries()
+        panel.setEntries(entries)
+        panel.setCounts(mapOf(entries[0] to 2, entries[1] to 0, entries[2] to 1))
+        panel.selectIndex(0)
+        listInside(panel).selectedIndex = 1
+        assertEquals("the selection stays put", 0, panel.selectedIndex())
+        assertEquals(0, fired)
+        listInside(panel).selectedIndex = 2
+        assertEquals(2, panel.selectedIndex())
+        assertEquals(1, fired)
+    }
+
+    private fun threeEntries(): List<BaseEntry> {
+        myFixture.addFileToProject("one/x.txt", "")
+        myFixture.addFileToProject("two/y.txt", "")
+        myFixture.addFileToProject("three/z.txt", "")
+        return listOf(
+            BaseEntry(myFixture.findFileInTempDir("one"), "one", true),
+            BaseEntry(myFixture.findFileInTempDir("two"), "two", true),
+            BaseEntry(myFixture.findFileInTempDir("three"), "three", true),
+        )
+    }
+
+    private fun listInside(panel: RootListPanel): JList<*> =
+        ((panel.component as JBScrollPane).viewport.view as JList<*>)
 
     fun testSetEntriesKeepsModelWhenUnchanged() {
         val panel = RootListPanel(project, onUserSelection = { })

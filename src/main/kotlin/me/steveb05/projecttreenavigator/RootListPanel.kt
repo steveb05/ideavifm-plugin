@@ -26,6 +26,7 @@ class RootListPanel(
     private val list = JBList(listModel)
     private var counts: Map<BaseEntry, Int>? = null
     private var suppressEvents = false
+    private var lastSelectableIndex = -1
 
     val component: JComponent = JBScrollPane(list)
 
@@ -34,7 +35,14 @@ class RootListPanel(
         list.emptyText.text = "Empty"
         list.cellRenderer = NavigatorEntryCellRenderer(project) { entry -> counts?.get(entry) }
         list.addListSelectionListener { e ->
-            if (!suppressEvents && !e.valueIsAdjusting) onUserSelection()
+            if (suppressEvents || e.valueIsAdjusting) return@addListSelectionListener
+            val index = list.selectedIndex
+            if (index >= 0 && !isSelectable(index)) {
+                selectIndex(lastSelectableIndex)
+                return@addListSelectionListener
+            }
+            lastSelectableIndex = index
+            onUserSelection()
         }
         list.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseMoved(e: MouseEvent) {
@@ -52,7 +60,9 @@ class RootListPanel(
     private fun maybeShowContextMenu(e: MouseEvent) {
         if (!e.isPopupTrigger) return
         val index = list.locationToIndex(e.point)
-        if (index >= 0 && list.getCellBounds(index, index).contains(e.point)) list.selectedIndex = index
+        if (index >= 0 && isSelectable(index) && list.getCellBounds(index, index).contains(e.point)) {
+            list.selectedIndex = index
+        }
         onContextMenu(list, e.point)
     }
 
@@ -89,6 +99,7 @@ class RootListPanel(
     fun selectIndex(index: Int) {
         if (listModel.isEmpty) return
         val coerced = index.coerceIn(0, listModel.size() - 1)
+        lastSelectableIndex = coerced
         suppressed {
             list.selectedIndex = coerced
             list.ensureIndexIsVisible(coerced)
@@ -104,7 +115,25 @@ class RootListPanel(
         entries().filter { VfsUtilCore.isAncestor(it.file, file, false) }
             .maxByOrNull { it.file.path.length }
 
-    fun move(delta: Int) = selectIndex(list.selectedIndex + delta)
+    /** A search grays out the entries with no matches; they are dead rows, so movement steps over them. */
+    fun move(delta: Int) {
+        if (listModel.isEmpty) return
+        val step = if (delta < 0) -1 else 1
+        var remaining = if (delta < 0) -delta else delta
+        var target = list.selectedIndex
+        var probe = target
+        while (remaining > 0) {
+            probe += step
+            if (probe < 0 || probe >= listModel.size()) break
+            if (!isSelectable(probe)) continue
+            target = probe
+            remaining--
+        }
+        if (target < 0) return
+        selectIndex(target)
+    }
+
+    private fun isSelectable(index: Int): Boolean = counts?.get(listModel.getElementAt(index)) != 0
 
     private inline fun suppressed(block: () -> Unit) {
         suppressEvents = true
