@@ -160,7 +160,27 @@ class TreePanel(
     fun resetToOpenState() {
         TreeUtil.collapseAll(tree, 0)
         expandToFirstFileLevel()
-        if (tree.rowCount > 0) tree.setSelectionRow(0)
+        selectFirstOpenedFolder()
+    }
+
+    /**
+     * Leaves the cursor where the reset opened to: the first folder whose own files are showing, rather
+     * than on a folder such as src that only exists to hold other folders.
+     */
+    private fun selectFirstOpenedFolder() {
+        if (tree.rowCount == 0) return
+        val row = (0 until tree.rowCount).firstOrNull { showsItsFiles(it) } ?: 0
+        tree.setSelectionRow(row)
+        tree.scrollRowToVisible(row)
+    }
+
+    private fun showsItsFiles(row: Int): Boolean {
+        val path = tree.getPathForRow(row) ?: return false
+        if (!tree.isExpanded(path)) return false
+        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return false
+        return node.children().asSequence()
+            .filterIsInstance<DefaultMutableTreeNode>()
+            .any { nodeData(it)?.isDirectory == false }
     }
 
     fun move(delta: Int) {

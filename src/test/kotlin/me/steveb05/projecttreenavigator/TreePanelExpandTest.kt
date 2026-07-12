@@ -31,12 +31,24 @@ class TreePanelExpandTest : BasePlatformTestCase() {
         assertEquals("neither collapsed nor left fully expanded", opened, rowsOf(panel))
     }
 
-    fun testResetSelectsTheTopRow() {
+    fun testResetPutsTheCursorOnTheFolderItOpenedInto() {
         val panel = panelOverModule()
         panel.expandAll()
         panel.move(5)
         panel.resetToOpenState()
-        val tree = (panel.component as JBScrollPane).viewport.view as JTree
-        assertEquals("the selection must not be left on a row that is now hidden", 0, tree.selectionRows?.first())
+        assertEquals(
+            "src only holds folders, the cursor belongs on the first folder showing its own files",
+            "main/kotlin",
+            panel.selectedData()?.name,
+        )
+    }
+
+    fun testWithoutAFolderToOpenIntoTheCursorSitsOnTheTopRow() {
+        val panel = TreePanel(project, { null }, onActivate = { }, onCommit = { })
+        myFixture.addFileToProject("flat/one.txt", "")
+        myFixture.addFileToProject("flat/two.txt", "")
+        panel.showSubtree(myFixture.findFileInTempDir("flat"))
+        panel.resetToOpenState()
+        assertEquals("one.txt", panel.selectedData()?.name)
     }
 }
