@@ -81,6 +81,11 @@ object BrowseTree {
         return deepest to names.toString()
     }
 
+    /**
+     * The folders to open so that files come into view, walked one branch at a time: a folder opens, and its
+     * subfolders keep opening until one of them holds files. A file sitting next to a folder does not stop
+     * that folder from opening, which is what a module looks like, with build.gradle.kts beside src.
+     */
     fun autoExpandTargets(
         project: Project,
         model: DefaultTreeModel,
@@ -88,23 +93,31 @@ object BrowseTree {
         maxNodes: Int = 200,
     ): List<DefaultMutableTreeNode> {
         val targets = ArrayList<DefaultMutableTreeNode>()
-        var level = listOf(model.root as DefaultMutableTreeNode)
-        for (depth in 0 until maxDepth) {
-            val next = ArrayList<DefaultMutableTreeNode>()
-            var hasFile = false
-            for (node in level) {
-                loadChildren(project, model, node)
-                for (child in node.children().asSequence().filterIsInstance<DefaultMutableTreeNode>()) {
-                    val data = child.userObject as? NavigatorNodeData ?: continue
-                    if (data.isDirectory) next.add(child) else hasFile = true
-                }
-            }
-            if (hasFile || next.isEmpty() || targets.size + next.size > maxNodes) return targets
-            targets.addAll(next)
-            level = next
+        val root = model.root as DefaultMutableTreeNode
+        loadChildren(project, model, root)
+        val pending = ArrayDeque<Pair<DefaultMutableTreeNode, Int>>()
+        directoryChildren(root).forEach { pending.addLast(it to 0) }
+        while (pending.isNotEmpty() && targets.size < maxNodes) {
+            val (node, depth) = pending.removeFirst()
+            if (depth >= maxDepth) continue
+            loadChildren(project, model, node)
+            targets.add(node)
+            if (holdsFiles(node)) continue
+            directoryChildren(node).forEach { pending.addLast(it to depth + 1) }
         }
         return targets
     }
+
+    private fun directoryChildren(node: DefaultMutableTreeNode): List<DefaultMutableTreeNode> =
+        node.children().asSequence()
+            .filterIsInstance<DefaultMutableTreeNode>()
+            .filter { (it.userObject as? NavigatorNodeData)?.isDirectory == true }
+            .toList()
+
+    private fun holdsFiles(node: DefaultMutableTreeNode): Boolean =
+        node.children().asSequence()
+            .filterIsInstance<DefaultMutableTreeNode>()
+            .any { (it.userObject as? NavigatorNodeData)?.isDirectory == false }
 
     private fun directoryNode(project: Project, dir: VirtualFile): DefaultMutableTreeNode {
         val (deepest, name) = compactChain(project, dir)

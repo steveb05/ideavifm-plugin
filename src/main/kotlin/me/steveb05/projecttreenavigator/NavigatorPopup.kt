@@ -351,7 +351,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             restore != null -> {
                 rootList.selectIndex(restore.leftIndex)
                 rebuildRight()
-                restoreRightSelection(restore)
+                walkOpenTo(restore.rightFile, current)
                 setActivePane(restore.pane)
             }
 
@@ -366,7 +366,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                     else -> rootList.selectIndex(0)
                 }
                 rebuildRight()
-                walkOpenTo(previousFile)
+                walkOpenTo(previousFile, current)
             }
         }
         firstOpen = false
@@ -404,13 +404,6 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val base = rootList.selectedEntry()?.file ?: return
         val land = OpenTarget.landing(base, *candidates) ?: return
         if (land == base) setActivePane(Pane.LEFT) else treePanel.locate(land, base)
-    }
-
-    private fun restoreRightSelection(frame: ZoomFrame) {
-        val entry = rootList.selectedEntry() ?: return
-        val target = frame.rightFile ?: return
-        if (!target.isValid || !VfsUtilCore.isAncestor(entry.file, target, true)) return
-        treePanel.locate(target, entry.file)
     }
 
     private fun rebuildRight() {
