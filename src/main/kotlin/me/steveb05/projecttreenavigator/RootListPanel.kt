@@ -48,9 +48,16 @@ class RootListPanel(
                 ipad = Insets(ipad.top, baseLeftInset + JBUI.scale(16) * value.indent, ipad.bottom, ipad.right)
                 icon = IconUtil.getIcon(value.file, 0, project)
                 val count = counts?.get(value)
-                val nameAttributes =
-                    if (count == 0) SimpleTextAttributes.GRAYED_ATTRIBUTES
-                    else SimpleTextAttributes.REGULAR_ATTRIBUTES
+                val statusColor = value.file.takeIf { it.isValid }?.let {
+                    if (value.isDirectory) VcsStatusColor.forDirectory(project, it)
+                    else VcsStatusColor.forFile(project, it)
+                }
+                val nameAttributes = when {
+                    count == 0 -> SimpleTextAttributes.GRAYED_ATTRIBUTES
+                    statusColor != null ->
+                        SimpleTextAttributes.REGULAR_ATTRIBUTES.derive(-1, statusColor, null, null)
+                    else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
+                }
                 append(value.name, nameAttributes)
                 value.parentHint?.let { append("  $it", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES) }
                 if (count != null && count > 0) {

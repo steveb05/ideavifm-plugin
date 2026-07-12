@@ -15,6 +15,7 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
@@ -80,6 +81,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var autoExpandModule = false
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
+    private var changedOnly = false
     private val fileNameSearch = FileNameSearch(project)
     private var alarm: Alarm? = null
 
@@ -155,6 +157,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         ) { zoomOut() }
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
+        commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
         commands.bind(NavigatorCommand.PREVIEW_LINE_DOWN, isEnabled = { previewVisible() }) { previewPanel.scrollLines(1) }
         commands.bind(NavigatorCommand.PREVIEW_LINE_UP, isEnabled = { previewVisible() }) { previewPanel.scrollLines(-1) }
@@ -244,6 +247,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
             filterMatches = null
             if (scope is NavigatorScope.Named) {
                 showNamedScopeBrowse(scope, resolved)
+            } else if (changedOnly) {
+                showChangedBrowse(resolved)
             } else {
                 generation++
                 namedMatches = null
@@ -357,8 +362,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
         ReadAction.nonBlocking<FileNameSearch.Result> {
+            val changed = if (changedOnly) changedFileSet() else null
             val raw = fileNameSearch.search(query, searchScope)
-            FileNameSearch.Result(raw.files.filter { !BrowseTree.hiddenByDotRule(project, it.file) }, raw.truncated)
+            FileNameSearch.Result(
+                raw.files.filter {
+                    !BrowseTree.hiddenByDotRule(project, it.file) && (changed == null || it.file in changed)
+                },
+                raw.truncated,
+            )
         }
             .coalesceBy(this)
             .expireWith(activePopup)
@@ -374,11 +385,50 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 else if (rootList.selectedEntry() == null) rootList.selectIndex(0)
                 rebuildRight()
                 setFooter(
-                    if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
-                    else null,
+                    footerNotes(
+                        if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
+                        else null,
+                    ),
                 )
             }
             .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun showChangedBrowse(resolved: ScopeResolver.Resolved) {
+        val activePopup = popup ?: return
+        val gen = ++generation
+        pendingRestore = null
+        namedMatches = null
+        val entries = effectiveEntries(resolved)
+        val searchScope = zoomedSearchScope(resolved)
+        ReadAction.nonBlocking<List<FileNameSearch.RankedFile>> {
+            changedFileSet()
+                .filter { searchScope.contains(it) && !BrowseTree.hiddenByDotRule(project, it) }
+                .sortedBy { it.path }
+                .map { FileNameSearch.RankedFile(it, 0) }
+        }
+            .coalesceBy(this)
+            .expireWith(activePopup)
+            .finishOnUiThread(ModalityState.stateForComponent(panel)) { files ->
+                if (gen != generation) return@finishOnUiThread
+                filterMatches = files
+                rootList.setEntries(entries)
+                rootList.setCounts(SubtreeMatches.countsFor(files, entries) { it.file })
+                val current = context.currentFile?.takeIf { it.isValid }
+                val containing = current?.let { rootList.entryContaining(it) }
+                if (containing != null) rootList.selectEntry(containing)
+                else if (rootList.selectedEntry() == null) rootList.selectIndex(0)
+                rebuildRight()
+                setFooter(footerNotes(null))
+            }
+            .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun changedFileSet(): Set<VirtualFile> {
+        val manager = ChangeListManager.getInstance(project)
+        val tracked = manager.allChanges.mapNotNull { it.virtualFile }
+        val unversioned = manager.unversionedFilesPaths.mapNotNull { it.virtualFile }
+        return (tracked + unversioned).filterTo(LinkedHashSet()) { it.isValid }
     }
 
     private fun showNamedScopeBrowse(named: NavigatorScope.Named, resolved: ScopeResolver.Resolved) {
@@ -386,8 +436,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val gen = ++generation
         pendingRestore = null
         ReadAction.nonBlocking<NamedScopeFiles.Result> {
+            val changed = if (changedOnly) changedFileSet() else null
             val raw = NamedScopeFiles.collect(project, named.namedScope)
-            NamedScopeFiles.Result(raw.files.filter { !BrowseTree.hiddenByDotRule(project, it) }, raw.truncated)
+            NamedScopeFiles.Result(
+                raw.files.filter { !BrowseTree.hiddenByDotRule(project, it) && (changed == null || it in changed) },
+                raw.truncated,
+            )
         }
             .coalesceBy(this)
             .expireWith(activePopup)
@@ -407,8 +461,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 if (containing == null) rootList.selectIndex(0) else rootList.selectEntry(containing)
                 rebuildRight()
                 setFooter(
-                    if (result.truncated) "Scope truncated to ${NamedScopeFiles.DEFAULT_LIMIT} files"
-                    else null,
+                    footerNotes(
+                        if (result.truncated) "Scope truncated to ${NamedScopeFiles.DEFAULT_LIMIT} files"
+                        else null,
+                    ),
                 )
             }
             .submit(AppExecutorUtil.getAppExecutorService())
@@ -451,6 +507,11 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun toggleDotFiles() {
         val settings = NavigatorSettings.getInstance()
         settings.hideDotFiles = !settings.hideDotFiles
+        refresh()
+    }
+
+    private fun toggleChangedOnly() {
+        changedOnly = !changedOnly
         refresh()
     }
 
@@ -598,5 +659,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun setFooter(text: String?) {
         footerLabel.text = text.orEmpty()
         footerLabel.isVisible = !text.isNullOrEmpty()
+    }
+
+    private fun footerNotes(extra: String?): String? {
+        val notes = listOfNotNull(if (changedOnly) "Changed files only" else null, extra)
+        return notes.joinToString("; ").ifEmpty { null }
     }
 }

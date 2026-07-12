@@ -25,8 +25,15 @@ class NavigatorTreeCellRenderer(
         hasFocus: Boolean,
     ) {
         val data = ((value as? DefaultMutableTreeNode)?.userObject as? NavigatorNodeData) ?: return
-        icon = data.file?.takeIf { it.isValid }?.let { IconUtil.getIcon(it, 0, project) }
-            ?: AllIcons.FileTypes.Any_type
+        val file = data.file?.takeIf { it.isValid }
+        icon = file?.let { IconUtil.getIcon(it, 0, project) } ?: AllIcons.FileTypes.Any_type
+        val statusColor = file?.let {
+            if (data.isDirectory) VcsStatusColor.forDirectory(project, it)
+            else VcsStatusColor.forFile(project, it)
+        }
+        val plain = statusColor
+            ?.let { SimpleTextAttributes.REGULAR_ATTRIBUTES.derive(-1, it, null, null) }
+            ?: SimpleTextAttributes.REGULAR_ATTRIBUTES
         val matcher = if (data.isDirectory) null else matcherProvider()
         val fragments = matcher?.matchingFragments(data.name)
         if (fragments != null) {
@@ -34,13 +41,11 @@ class NavigatorTreeCellRenderer(
                 this,
                 data.name,
                 fragments,
-                SimpleTextAttributes.REGULAR_ATTRIBUTES,
-                SimpleTextAttributes.REGULAR_ATTRIBUTES.derive(
-                    SimpleTextAttributes.STYLE_SEARCH_MATCH, null, null, null,
-                ),
+                plain,
+                plain.derive(SimpleTextAttributes.STYLE_SEARCH_MATCH, null, null, null),
             )
         } else {
-            append(data.name)
+            append(data.name, plain)
         }
     }
 }

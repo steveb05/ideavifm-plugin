@@ -21,6 +21,7 @@ enum class NavigatorCommand(val actionId: String) {
     ZOOM_OUT("ProjectTreeNavigator.ZoomOut"),
     TOGGLE_PREVIEW("ProjectTreeNavigator.TogglePreview"),
     TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles"),
+    TOGGLE_CHANGED("ProjectTreeNavigator.ToggleChangedOnly"),
     NEW_ELEMENT("ProjectTreeNavigator.NewElement"),
     PREVIEW_LINE_DOWN("ProjectTreeNavigator.PreviewLineDown"),
     PREVIEW_LINE_UP("ProjectTreeNavigator.PreviewLineUp"),

@@ -34,7 +34,8 @@ class NavigatorConfigurable : BoundConfigurable("Project Tree Navigator") {
         }
         row {
             comment(
-                "Inside the popup: Ctrl+Period toggles dot files, Alt+P toggles the preview. " +
+                "Inside the popup: Ctrl+Period toggles dot files, Alt+P toggles the preview, " +
+                    "Alt+C shows only files with VCS changes. " +
                     "All navigator commands are remappable in Settings, Keymap.",
             )
         }

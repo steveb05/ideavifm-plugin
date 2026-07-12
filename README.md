@@ -26,6 +26,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Backspace` (empty query) | Zoom out |
 | `Alt+P` | Toggle the preview pane |
 | `Ctrl+Period` | Toggle dot file hiding |
+| `Alt+C` | Toggle showing only files with VCS changes |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | Open the IDE New menu for the selected folder (file templates included) |
@@ -36,7 +37,10 @@ Movement keys make their pane the active one; `Enter`, zoom and the
 preview follow the pane you last moved. The active pane carries a
 focus colored outline. Module scope groups Gradle source set modules
 (`main`, `test` and friends) into one view, so test and resource
-folders show up.
+folders show up. File and folder names carry the IDE's VCS status
+colors (modified, added, untracked, ignored), and folders containing
+changes are tinted like modified files; `Alt+C` narrows both panes to
+changed files only, composing with search, scopes and zoom.
 
 ## Settings
 

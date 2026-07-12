@@ -26,6 +26,12 @@ class NavigatorCommandTest : BasePlatformTestCase() {
         }
     }
 
+    fun testEveryCommandHasDefaultShortcut() {
+        for (command in NavigatorCommand.entries) {
+            assertTrue(command.actionId, command.shortcutSet().shortcuts.isNotEmpty())
+        }
+    }
+
     fun testRemovedDefaultIsRespected() {
         val keymap = KeymapManager.getInstance().activeKeymap
         val default = KeyboardShortcut(KeyStroke.getKeyStroke("alt K"), null)
