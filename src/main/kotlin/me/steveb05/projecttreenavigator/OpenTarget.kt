@@ -22,6 +22,11 @@ object OpenTarget {
         return entries.firstOrNull()
     }
 
+    /** Which file the tree walks open to inside [base]: the first of the candidates that lives under it. */
+    fun landing(base: VirtualFile, vararg candidates: VirtualFile?): VirtualFile? =
+        candidates.filterNotNull()
+            .firstOrNull { it.isValid && VfsUtilCore.isAncestor(base, it, false) }
+
     private fun containing(entries: List<BaseEntry>, file: VirtualFile): BaseEntry? =
         entries.filter { VfsUtilCore.isAncestor(it.file, file, false) }
             .maxByOrNull { it.file.path.length }

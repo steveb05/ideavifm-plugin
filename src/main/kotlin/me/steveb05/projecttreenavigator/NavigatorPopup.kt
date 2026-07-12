@@ -96,7 +96,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var restoredEntry: VirtualFile? = null
     private var restoredFile: VirtualFile? = null
     private var searchWasActive = false
-    private var searchCleared = false
+    private var reopen = false
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private var changedOnly = false
@@ -245,6 +245,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         scopeIndex = ((scopeIndex + delta) % scopes.size + scopes.size) % scopes.size
         zoomStack.clear()
         pendingRestore = null
+        reopen = true
         setActivePane(Pane.RIGHT)
         refresh()
     }
@@ -296,6 +297,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun zoomIn() {
         val dir = activeSelectedDirectory() ?: return
         zoomStack.addLast(ZoomFrame(dir, rootList.selectedIndex(), treePanel.selectedFile(), activePane))
+        reopen = true
         setActivePane(Pane.LEFT)
         refresh()
     }
@@ -311,7 +313,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
         autoExpand = query.isEmpty()
-        searchCleared = query.isEmpty() && searchWasActive
+        if (query.isEmpty() && searchWasActive) reopen = true
         searchWasActive = query.isNotEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
@@ -338,12 +340,13 @@ class NavigatorPopup(private val context: NavigatorContext) {
         treePanel.setEmptyText("No files in scope")
         val entries = effectiveEntries(resolved)
         val previous = rootList.selectedEntry()
+        val previousFile = treePanel.selectedFile()
         rootList.setEntries(entries)
         val restore = pendingRestore
         pendingRestore = null
         val current = context.currentFile?.takeIf { it.isValid }
-        val opening = firstOpen || searchCleared
-        searchCleared = false
+        val opening = firstOpen || reopen
+        reopen = false
         when {
             restore != null -> {
                 rootList.selectIndex(restore.leftIndex)
@@ -352,7 +355,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 setActivePane(restore.pane)
             }
 
-            opening -> positionOnOpen(entries, current, previous)
+            opening -> positionOnOpen(entries, current, previous, previousFile)
 
             else -> {
                 val kept = previous?.let { p -> entries.firstOrNull { it.file == p.file } }
@@ -363,17 +366,23 @@ class NavigatorPopup(private val context: NavigatorContext) {
                     else -> rootList.selectIndex(0)
                 }
                 rebuildRight()
+                walkOpenTo(previousFile)
             }
         }
         firstOpen = false
     }
 
     /**
-     * Opening the popup and clearing a search have to leave the same view: the tree walked open down to the
-     * file being edited. Without a file to land on it falls back to the view that was remembered, then to
-     * whatever was already selected.
+     * Opening the popup, switching scope, zooming and clearing a search all have to leave the same view: the
+     * tree walked open down to the file being edited. Without that file in view it falls back to the view
+     * that was remembered, then to whatever was already selected.
      */
-    private fun positionOnOpen(entries: List<BaseEntry>, current: VirtualFile?, previous: BaseEntry?) {
+    private fun positionOnOpen(
+        entries: List<BaseEntry>,
+        current: VirtualFile?,
+        previous: BaseEntry?,
+        previousFile: VirtualFile?,
+    ) {
         val remembered = restoredEntry
         val rememberedFile = restoredFile
         restoredEntry = null
@@ -387,14 +396,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         rootList.selectEntry(target)
         rebuildRight()
+        walkOpenTo(current, rememberedFile, previousFile)
+    }
 
-        val land = current?.takeIf { VfsUtilCore.isAncestor(target.file, it, false) }
-            ?: rememberedFile?.takeIf { it.isValid && VfsUtilCore.isAncestor(target.file, it, true) }
-        when {
-            land == null -> Unit
-            land == target.file -> setActivePane(Pane.LEFT)
-            else -> treePanel.locate(land, target.file)
-        }
+    /** Walks the tree open to the first of [candidates] that lives under the selected entry. */
+    private fun walkOpenTo(vararg candidates: VirtualFile?) {
+        val base = rootList.selectedEntry()?.file ?: return
+        val land = OpenTarget.landing(base, *candidates) ?: return
+        if (land == base) setActivePane(Pane.LEFT) else treePanel.locate(land, base)
     }
 
     private fun restoreRightSelection(frame: ZoomFrame) {

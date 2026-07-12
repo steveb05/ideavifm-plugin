@@ -49,4 +49,17 @@ class OpenTargetTest : BasePlatformTestCase() {
     fun testNothingToChooseFrom() {
         assertNull(OpenTarget.choose(emptyList(), current = null, remembered = null, previous = null))
     }
+
+    fun testTheTreeWalksOpenToTheFirstCandidateThatLivesUnderTheEntry() {
+        val engine = entries[0].file
+        val outside = myFixture.findFileInTempDir("extensions/src/Vault.kt")
+        val inside = myFixture.findFileInTempDir("engine/src/Region.kt")
+        assertEquals(inside, OpenTarget.landing(engine, outside, inside))
+        assertNull("nothing under this entry to open to", OpenTarget.landing(engine, outside, null))
+    }
+
+    fun testTheEntryItselfCountsAsALanding() {
+        val docs = entries[2].file
+        assertEquals(docs, OpenTarget.landing(docs, docs))
+    }
 }

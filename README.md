@@ -47,10 +47,11 @@ stays in the search field and you can keep typing after clicking a row;
 left pane loops around the ends of the list. While a search is running,
 left pane entries with no matches are grayed out and behave as dead
 rows: movement steps over them and they cannot be selected or clicked.
-Clearing the query puts the panes back the way they open: the tree walks
-open down to the file you are editing. Without a file to land on it
-falls back to the entry the view was left on, then to the one that was
-already selected.
+Clearing the query, switching scope and zooming all leave the same view
+the popup opens with: the tree walked open down to the file you are
+editing. Without that file in view it falls back to the entry the view
+was left on, then to the one that was already selected. Toggles keep the
+tree open where it was.
 
 A query matches a file name loosely, letter by letter, or a path in
 word sized chunks: the letters may jump between folders and the file
