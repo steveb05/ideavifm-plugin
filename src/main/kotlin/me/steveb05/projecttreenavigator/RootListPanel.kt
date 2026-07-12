@@ -12,6 +12,8 @@ import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.IconUtil
 import com.intellij.util.ui.JBUI
 import java.awt.Insets
+import java.awt.Point
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.DefaultListModel
@@ -23,6 +25,7 @@ class RootListPanel(
     private val project: Project,
     private val onUserSelection: () -> Unit,
     private val onHover: (VirtualFile) -> Unit = {},
+    private val onContextMenu: (JComponent, Point) -> Unit = { _, _ -> },
 ) {
 
     private val listModel = DefaultListModel<BaseEntry>()
@@ -74,6 +77,18 @@ class RootListPanel(
                 if (index >= 0) onHover(listModel.getElementAt(index).file)
             }
         })
+        list.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) = maybeShowContextMenu(e)
+
+            override fun mouseReleased(e: MouseEvent) = maybeShowContextMenu(e)
+        })
+    }
+
+    private fun maybeShowContextMenu(e: MouseEvent) {
+        if (!e.isPopupTrigger) return
+        val index = list.locationToIndex(e.point)
+        if (index >= 0 && list.getCellBounds(index, index).contains(e.point)) list.selectedIndex = index
+        onContextMenu(list, e.point)
     }
 
     fun setActive(active: Boolean) {

@@ -1,12 +1,17 @@
 package me.steveb05.projecttreenavigator
 
+import com.intellij.ide.CopyPasteDelegator
 import com.intellij.ide.IdeView
+import com.intellij.ide.PsiCopyPasteManager
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.LangDataKeys
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -28,13 +33,16 @@ import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.SearchTextField
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.Alarm
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
 import java.awt.Dimension
+import java.awt.Point
 import javax.swing.Box
+import javax.swing.JComponent
 import javax.swing.event.DocumentEvent
 
 class NavigatorPopup(private val context: NavigatorContext) {
@@ -63,14 +71,19 @@ class NavigatorPopup(private val context: NavigatorContext) {
         onCommit = { commitSelection() },
         onHover = { previewHover(it) },
         onSelectionChanged = { refreshPreview() },
+        onContextMenu = { component, point -> showContextMenu(component, point) },
     )
     private val rootList = RootListPanel(
         project,
         onUserSelection = { onUserListSelection() },
         onHover = { previewHover(it) },
+        onContextMenu = { component, point -> showContextMenu(component, point) },
     )
     private val previewPanel = PreviewPanel(project)
     private val panel = BorderLayoutPanel()
+    private val copyPaste = object : CopyPasteDelegator(project, panel) {
+        override fun getSelectedElements(context: DataContext): Array<PsiElement> = targetElements()
+    }
 
     private var popup: JBPopup? = null
     private var generation = 0
@@ -82,6 +95,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private var changedOnly = false
+    private var footerNote: String? = null
     private val fileNameSearch = FileNameSearch(project)
     private var alarm: Alarm? = null
 
@@ -159,6 +173,37 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
+        commands.bind(NavigatorCommand.TOGGLE_MARK, isEnabled = { activePane == Pane.RIGHT }) {
+            toggleMark()
+        }
+        commands.bindFixed(
+            "SPACE",
+            isEnabled = { searchField.text.isEmpty() && activePane == Pane.RIGHT },
+        ) { toggleMark() }
+        commands.bind(
+            NavigatorCommand.RENAME,
+            isEnabled = { targetFiles().size == 1 },
+        ) { runFileAction(NavigatorFileActions.RENAME) }
+        commands.bind(
+            NavigatorCommand.MOVE,
+            isEnabled = { targetFiles().isNotEmpty() },
+        ) { runFileAction(NavigatorFileActions.MOVE) }
+        commands.bind(
+            NavigatorCommand.DELETE,
+            isEnabled = { searchField.text.isEmpty() && targetFiles().isNotEmpty() },
+        ) { runFileAction(NavigatorFileActions.DELETE) }
+        commands.bind(
+            NavigatorCommand.COPY,
+            isEnabled = { searchField.text.isEmpty() && targetFiles().isNotEmpty() },
+        ) { runFileAction(NavigatorFileActions.COPY) }
+        commands.bind(
+            NavigatorCommand.CUT,
+            isEnabled = { searchField.text.isEmpty() && targetFiles().isNotEmpty() },
+        ) { runFileAction(NavigatorFileActions.CUT) }
+        commands.bind(
+            NavigatorCommand.PASTE,
+            isEnabled = { searchField.text.isEmpty() && clipboardHasFiles() && createTargetDirectory() != null },
+        ) { runFileAction(NavigatorFileActions.PASTE) }
         commands.bind(NavigatorCommand.PREVIEW_LINE_DOWN, isEnabled = { previewVisible() }) { previewPanel.scrollLines(1) }
         commands.bind(NavigatorCommand.PREVIEW_LINE_UP, isEnabled = { previewVisible() }) { previewPanel.scrollLines(-1) }
         commands.bind(NavigatorCommand.PREVIEW_HALF_DOWN, isEnabled = { previewVisible() }) { previewPanel.scrollHalfPage(1) }
@@ -262,7 +307,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun showBrowse(resolved: ScopeResolver.Resolved) {
         rootList.clearCounts()
-        setFooter(null)
+        updateFooter(null)
         treePanel.setEmptyText("No files in scope")
         val entries = effectiveEntries(resolved)
         val previous = rootList.selectedEntry()
@@ -384,11 +429,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 if (bestEntry != null) rootList.selectEntry(bestEntry)
                 else if (rootList.selectedEntry() == null) rootList.selectIndex(0)
                 rebuildRight()
-                setFooter(
-                    footerNotes(
-                        if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
-                        else null,
-                    ),
+                updateFooter(
+                    if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
+                    else null,
                 )
             }
             .submit(AppExecutorUtil.getAppExecutorService())
@@ -419,7 +462,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 if (containing != null) rootList.selectEntry(containing)
                 else if (rootList.selectedEntry() == null) rootList.selectIndex(0)
                 rebuildRight()
-                setFooter(footerNotes(null))
+                updateFooter(null)
             }
             .submit(AppExecutorUtil.getAppExecutorService())
     }
@@ -460,11 +503,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 val containing = current?.let { rootList.entryContaining(it) }
                 if (containing == null) rootList.selectIndex(0) else rootList.selectEntry(containing)
                 rebuildRight()
-                setFooter(
-                    footerNotes(
-                        if (result.truncated) "Scope truncated to ${NamedScopeFiles.DEFAULT_LIMIT} files"
-                        else null,
-                    ),
+                updateFooter(
+                    if (result.truncated) "Scope truncated to ${NamedScopeFiles.DEFAULT_LIMIT} files"
+                    else null,
                 )
             }
             .submit(AppExecutorUtil.getAppExecutorService())
@@ -516,18 +557,86 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun showNewElement() {
-        val dir = createTargetDirectory() ?: return
-        val psiDir = PsiManager.getInstance(project).findDirectory(dir) ?: return
-        val group = ActionManager.getInstance().getAction("NewGroup") as? ActionGroup ?: return
-        val dataContext = SimpleDataContext.builder()
-            .add(CommonDataKeys.PROJECT, project)
-            .add(PlatformCoreDataKeys.MODULE, ModuleUtilCore.findModuleForFile(dir, project))
-            .add(LangDataKeys.IDE_VIEW, PopupIdeView(psiDir))
-            .build()
+        val group = ActionManager.getInstance().getAction(NavigatorFileActions.NEW) as? ActionGroup ?: return
+        val dataContext = fileActionContext() ?: return
         JBPopupFactory.getInstance()
             .createActionGroupPopup("New", group, dataContext, JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, false)
             .showInCenterOf(panel)
     }
+
+    private fun showContextMenu(component: JComponent, point: Point) {
+        val dataContext = fileActionContext() ?: return
+        JBPopupFactory.getInstance()
+            .createActionGroupPopup(
+                null,
+                NavigatorFileActions.contextGroup(),
+                dataContext,
+                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                true,
+            )
+            .show(RelativePoint(component, point))
+    }
+
+    private fun toggleMark() {
+        treePanel.toggleMark()
+        updateFooter()
+    }
+
+    private fun runFileAction(actionId: String) {
+        val dataContext = fileActionContext() ?: return
+        NavigatorFileActions.perform(actionId, dataContext) { afterFileAction() }
+    }
+
+    private fun afterFileAction() {
+        val activePopup = popup ?: return
+        ApplicationManager.getApplication().invokeLater(
+            {
+                if (activePopup.isDisposed) return@invokeLater
+                treePanel.clearMarks()
+                refresh()
+            },
+            ModalityState.stateForComponent(panel),
+        )
+    }
+
+    private fun targetFiles(): List<VirtualFile> {
+        val selected = when (activePane) {
+            Pane.LEFT -> listOfNotNull(rootList.selectedEntry()?.file)
+            else -> treePanel.markedFiles().ifEmpty { listOfNotNull(treePanel.selectedFile()) }
+        }
+        return selected.filter { it.isValid }
+    }
+
+    private fun targetElements(): Array<PsiElement> {
+        val manager = PsiManager.getInstance(project)
+        val elements: List<PsiElement> = targetFiles().mapNotNull {
+            if (it.isDirectory) manager.findDirectory(it) else manager.findFile(it)
+        }
+        return elements.toTypedArray()
+    }
+
+    private fun fileActionContext(): DataContext? {
+        val dir = createTargetDirectory() ?: return null
+        val psiDir = PsiManager.getInstance(project).findDirectory(dir) ?: return null
+        val files = targetFiles()
+        val elements = targetElements()
+        val builder = SimpleDataContext.builder()
+            .add(CommonDataKeys.PROJECT, project)
+            .add(PlatformCoreDataKeys.CONTEXT_COMPONENT, panel)
+            .add(PlatformCoreDataKeys.MODULE, ModuleUtilCore.findModuleForFile(dir, project))
+            .add(LangDataKeys.IDE_VIEW, PopupIdeView(psiDir))
+            .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, files.toTypedArray())
+            .add(PlatformCoreDataKeys.PSI_ELEMENT_ARRAY, elements)
+            .add(PlatformDataKeys.COPY_PROVIDER, copyPaste.copyProvider)
+            .add(PlatformDataKeys.CUT_PROVIDER, copyPaste.cutProvider)
+            .add(PlatformDataKeys.PASTE_PROVIDER, copyPaste.pasteProvider)
+        files.firstOrNull()?.let { builder.add(CommonDataKeys.VIRTUAL_FILE, it) }
+        elements.firstOrNull()?.let { builder.add(CommonDataKeys.PSI_ELEMENT, it) }
+        return builder.build()
+    }
+
+    private fun clipboardHasFiles(): Boolean =
+        PsiCopyPasteManager.getInstance().getElements(BooleanArray(1)) != null
 
     private fun createTargetDirectory(): VirtualFile? {
         val selected =
@@ -661,8 +770,18 @@ class NavigatorPopup(private val context: NavigatorContext) {
         footerLabel.isVisible = !text.isNullOrEmpty()
     }
 
+    private fun updateFooter(note: String? = footerNote) {
+        footerNote = note
+        setFooter(footerNotes(note))
+    }
+
     private fun footerNotes(extra: String?): String? {
-        val notes = listOfNotNull(if (changedOnly) "Changed files only" else null, extra)
+        val markCount = treePanel.markedFiles().size
+        val notes = listOfNotNull(
+            if (markCount > 0) "$markCount marked" else null,
+            if (changedOnly) "Changed files only" else null,
+            extra,
+        )
         return notes.joinToString("; ").ifEmpty { null }
     }
 }

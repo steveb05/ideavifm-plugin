@@ -30,6 +30,11 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | Open the IDE New menu for the selected folder (file templates included) |
+| `Space` (empty query) or `Alt+M` | Mark or unmark the row; marked rows are bold and survive navigation |
+| `Shift+F6` / `F6` | Rename / move the target (IDE refactoring, references are updated) |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy, cut, paste files (empty query; paste falls back to text when the clipboard holds no files) |
+| `Delete` (empty query) | Delete the target (safe delete when the IDE offers it) |
+| right click | File menu: New, Rename, Move, Cut, Copy, Paste, Delete |
 | `Tab` / `Shift+Tab` | Cycle scope: Project, Module, Folder, custom scopes |
 | `Esc` | Close |
 
@@ -42,15 +47,25 @@ colors (modified, added, untracked, ignored), and folders containing
 changes are tinted like modified files; `Alt+C` narrows both panes to
 changed files only, composing with search, scopes and zoom.
 
+File operations delegate to the IDE, so renaming a class file runs the
+rename refactoring and moving updates imports. They act on the marked
+rows if there are any, otherwise on the row under the cursor, which is
+how a multi file move works: mark with `Space`, then `F6`. Marks are
+bold with a leading `✱` and the footer counts them; they clear when the
+tree is rebuilt (new query, scope, zoom) or once an operation finishes.
+`Ctrl+click` marks with the mouse.
+
 ## Settings
 
 Settings, Tools, Project Tree Navigator: hide dot files (default on),
 compact folder chains (default on), left pane children of top level
 folders with or without loose files (default on), preview pane
-(default off). Every popup command above appears with its default
-shortcut in Settings, Keymap under "Project Tree Navigator";
+(default off). The navigator specific commands appear with their
+default shortcuts in Settings, Keymap under "Project Tree Navigator";
 assignments there win, and removing a shortcut in the keymap disables
-it in the popup.
+it in the popup. Rename, move, cut, copy, paste and delete follow the
+shortcuts you already have for those IDE actions, so remapping them in
+the keymap changes them in the popup too.
 
 Custom scopes defined in Settings, Appearance and Behavior, Scopes appear
 as extra chips after Folder.

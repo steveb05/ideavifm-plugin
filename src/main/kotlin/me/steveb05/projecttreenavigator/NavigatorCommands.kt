@@ -22,11 +22,18 @@ enum class NavigatorCommand(val actionId: String) {
     TOGGLE_PREVIEW("ProjectTreeNavigator.TogglePreview"),
     TOGGLE_DOT_FILES("ProjectTreeNavigator.ToggleDotFiles"),
     TOGGLE_CHANGED("ProjectTreeNavigator.ToggleChangedOnly"),
+    TOGGLE_MARK("ProjectTreeNavigator.ToggleMark"),
     NEW_ELEMENT("ProjectTreeNavigator.NewElement"),
     PREVIEW_LINE_DOWN("ProjectTreeNavigator.PreviewLineDown"),
     PREVIEW_LINE_UP("ProjectTreeNavigator.PreviewLineUp"),
     PREVIEW_HALF_DOWN("ProjectTreeNavigator.PreviewHalfDown"),
     PREVIEW_HALF_UP("ProjectTreeNavigator.PreviewHalfUp"),
+    RENAME(NavigatorFileActions.RENAME),
+    MOVE(NavigatorFileActions.MOVE),
+    DELETE(NavigatorFileActions.DELETE),
+    COPY(NavigatorFileActions.COPY),
+    CUT(NavigatorFileActions.CUT),
+    PASTE(NavigatorFileActions.PASTE),
     ;
 
     fun shortcutSet(): CustomShortcutSet =

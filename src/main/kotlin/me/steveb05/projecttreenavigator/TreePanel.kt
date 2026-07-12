@@ -11,6 +11,7 @@ import com.intellij.ui.render.RenderingUtil
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
+import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
@@ -39,11 +40,13 @@ class TreePanel(
     private val onCommit: () -> Unit,
     private val onHover: (VirtualFile) -> Unit = {},
     private val onSelectionChanged: () -> Unit = {},
+    private val onContextMenu: (JComponent, Point) -> Unit = { _, _ -> },
 ) {
 
     enum class CollapseOutcome { COLLAPSED, MOVED_TO_PARENT, AT_TOP_LEVEL }
 
     private val tree = Tree()
+    private val marked = LinkedHashSet<VirtualFile>()
 
     val component: JComponent = JBScrollPane(tree)
 
@@ -52,7 +55,7 @@ class TreePanel(
         tree.showsRootHandles = true
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
         tree.toggleClickCount = 0
-        tree.cellRenderer = NavigatorTreeCellRenderer(project, matcherProvider)
+        tree.cellRenderer = NavigatorTreeCellRenderer(project, matcherProvider) { it in marked }
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
@@ -62,8 +65,18 @@ class TreePanel(
             override fun treeWillCollapse(event: TreeExpansionEvent) = Unit
         })
         tree.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) = maybeShowContextMenu(e)
+
+            override fun mouseReleased(e: MouseEvent) = maybeShowContextMenu(e)
+
             override fun mouseClicked(e: MouseEvent) {
+                if (e.isPopupTrigger) return
                 onActivate()
+                if (e.isControlDown) {
+                    selectRowAt(e)
+                    toggleMark(advance = false)
+                    return
+                }
                 if (e.clickCount == 2) onCommit()
             }
         })
@@ -89,16 +102,34 @@ class TreePanel(
         tree.emptyText.text = text
     }
 
+    fun toggleMark(advance: Boolean = true) {
+        val file = selectedFile() ?: return
+        if (!marked.remove(file)) marked.add(file)
+        if (advance) move(1)
+        tree.repaint()
+    }
+
+    fun markedFiles(): List<VirtualFile> = marked.filter { it.isValid }
+
+    fun clearMarks() {
+        if (marked.isEmpty()) return
+        marked.clear()
+        tree.repaint()
+    }
+
     fun showSubtree(base: VirtualFile) {
+        marked.clear()
         tree.model = BrowseTree.createSubtreeModel(project, base)
         if (tree.rowCount > 0) tree.setSelectionRow(0)
     }
 
     fun showEmpty() {
+        marked.clear()
         tree.model = DefaultTreeModel(DefaultMutableTreeNode(NavigatorNodeData(null, "", true)))
     }
 
     fun showPruned(ranked: List<FileNameSearch.RankedFile>, base: VirtualFile?) {
+        marked.clear()
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base?.name.orEmpty(), true))
         if (base != null) {
             val prunedMatches = ranked.mapNotNull { m ->
@@ -237,6 +268,18 @@ class TreePanel(
             parent.add(child)
             if (n.payload == null) appendPruned(child, n.children)
         }
+    }
+
+    private fun maybeShowContextMenu(e: MouseEvent) {
+        if (!e.isPopupTrigger) return
+        onActivate()
+        selectRowAt(e)
+        onContextMenu(tree, e.point)
+    }
+
+    private fun selectRowAt(e: MouseEvent) {
+        val row = tree.getRowForLocation(e.x, e.y)
+        if (row >= 0) tree.setSelectionRow(row)
     }
 
     private fun selectPath(path: TreePath) {
