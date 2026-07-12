@@ -115,22 +115,21 @@ class RootListPanel(
         entries().filter { VfsUtilCore.isAncestor(it.file, file, false) }
             .maxByOrNull { it.file.path.length }
 
-    /** A search grays out the entries with no matches; they are dead rows, so movement steps over them. */
+    /**
+     * Movement wraps around the ends of the list, and steps over the entries a search grayed out, which are
+     * dead rows. With nothing selectable there is nowhere to go.
+     */
     fun move(delta: Int) {
-        if (listModel.isEmpty) return
+        val size = listModel.size()
+        if (size == 0 || (0 until size).none { isSelectable(it) }) return
         val step = if (delta < 0) -1 else 1
         var remaining = if (delta < 0) -delta else delta
-        var target = list.selectedIndex
-        var probe = target
+        var index = list.selectedIndex.takeIf { it >= 0 } ?: if (step > 0) size - 1 else 0
         while (remaining > 0) {
-            probe += step
-            if (probe < 0 || probe >= listModel.size()) break
-            if (!isSelectable(probe)) continue
-            target = probe
-            remaining--
+            index = Math.floorMod(index + step, size)
+            if (isSelectable(index)) remaining--
         }
-        if (target < 0) return
-        selectIndex(target)
+        selectIndex(index)
     }
 
     /** A search grays out the entries it found nothing in; those rows are dead and cannot take a selection. */

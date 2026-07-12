@@ -16,6 +16,7 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         var showPreview: Boolean = false,
         var leftPaneChildren: Boolean = true,
         var leftPaneChildFiles: Boolean = true,
+        var restoreLastView: Boolean = false,
     )
 
     private var current = State()
@@ -54,6 +55,12 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         get() = current.leftPaneChildFiles
         set(value) {
             current.leftPaneChildFiles = value
+        }
+
+    var restoreLastView: Boolean
+        get() = current.restoreLastView
+        set(value) {
+            current.restoreLastView = value
         }
 
     companion object {

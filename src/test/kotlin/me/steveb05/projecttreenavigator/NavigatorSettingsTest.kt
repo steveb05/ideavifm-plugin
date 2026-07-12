@@ -11,6 +11,7 @@ class NavigatorSettingsTest : TestCase() {
         assertFalse(state.showPreview)
         assertTrue(state.leftPaneChildren)
         assertTrue(state.leftPaneChildFiles)
+        assertFalse("the popup opens on the current file unless asked otherwise", state.restoreLastView)
     }
 
     fun testLoadStateRoundTrip() {
@@ -22,6 +23,7 @@ class NavigatorSettingsTest : TestCase() {
                 showPreview = true,
                 leftPaneChildren = false,
                 leftPaneChildFiles = false,
+                restoreLastView = true,
             ),
         )
         assertFalse(settings.hideDotFiles)
@@ -29,6 +31,7 @@ class NavigatorSettingsTest : TestCase() {
         assertTrue(settings.showPreview)
         assertFalse(settings.leftPaneChildren)
         assertFalse(settings.leftPaneChildFiles)
+        assertTrue(settings.restoreLastView)
         settings.hideDotFiles = true
         assertTrue(settings.state.hideDotFiles)
     }

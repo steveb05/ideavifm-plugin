@@ -43,10 +43,12 @@ Movement keys make their pane the active one; `Enter`, zoom and the
 preview follow the pane you last moved. The active pane carries a
 focus colored outline. Neither pane takes keyboard focus, so the caret
 stays in the search field and you can keep typing after clicking a row;
-`Ctrl+F` brings it back if the preview editor took it. While a search
-is running, left pane entries with no matches are grayed out and behave
-as dead rows: movement steps over them and they cannot be selected or
-clicked.
+`Ctrl+F` brings it back if the preview editor took it. Movement in the
+left pane loops around the ends of the list. While a search is running,
+left pane entries with no matches are grayed out and behave as dead
+rows: movement steps over them and they cannot be selected or clicked.
+Clearing the query puts the right pane back the way it opens, expanded
+down to the first level that holds files.
 
 A query matches a file name loosely, letter by letter, or a path in
 word sized chunks: the letters may jump between folders and the file
@@ -83,7 +85,10 @@ tree is rebuilt (new query, scope, zoom) or once an operation finishes.
 Settings, Tools, Project Tree Navigator: hide dot files (default on),
 compact folder chains (default on), left pane children of top level
 folders with or without loose files (default on), preview pane
-(default off). The navigator specific commands appear with their
+(default off), and what the popup opens on (default the file you are
+editing; turn on "Open on the last scope and zoom" to have it come back
+where you left it instead, remembering the scope, the zoom and the
+selection per project). The navigator specific commands appear with their
 default shortcuts in Settings, Keymap under "Project Tree Navigator";
 assignments there win, and removing a shortcut in the keymap disables
 it in the popup. New, rename, move, cut, copy, paste and delete are the

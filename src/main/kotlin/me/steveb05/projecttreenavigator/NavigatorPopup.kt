@@ -18,6 +18,7 @@ import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VfsUtilCore
@@ -91,7 +92,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var firstOpen = true
     private var pendingRestore: ZoomFrame? = null
     private var currentHighlight: QueryHighlight? = null
-    private var autoExpandModule = false
+    private var autoExpand = false
+    private var restoredEntry: VirtualFile? = null
+    private var restoredFile: VirtualFile? = null
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private var changedOnly = false
@@ -119,9 +122,28 @@ class NavigatorPopup(private val context: NavigatorContext) {
             override fun textChanged(e: DocumentEvent) = scheduleRefresh()
         })
         registerKeys()
+        Disposer.register(created) { saveView() }
         setActivePane(Pane.RIGHT)
+        if (NavigatorSettings.getInstance().restoreLastView) restoreView()
         refresh()
         created.showCenteredInCurrentWindow(project)
+    }
+
+    private fun restoreView() {
+        val saved = NavigatorViewState.getInstance(project)
+        scopeIndex = scopes.indexOfFirst { it.label == saved.scope() }.takeIf { it >= 0 } ?: scopeIndex
+        saved.zoom().forEach { zoomStack.addLast(ZoomFrame(it, 0, null, Pane.RIGHT)) }
+        restoredEntry = saved.entry()
+        restoredFile = saved.file()
+    }
+
+    private fun saveView() {
+        NavigatorViewState.getInstance(project).save(
+            scope = scopes[scopeIndex].label,
+            zoom = zoomStack.map { it.dir }.filter { it.isValid },
+            entry = rootList.selectedEntry()?.file,
+            file = treePanel.selectedFile(),
+        )
     }
 
     private fun buildPanel() {
@@ -286,7 +308,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val query = searchField.text.trim()
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
-        autoExpandModule = scope == NavigatorScope.Module && !resolved.fellBack && query.isEmpty()
+        autoExpand = query.isEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
             currentHighlight = null
@@ -316,12 +338,25 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val restore = pendingRestore
         pendingRestore = null
         val current = context.currentFile?.takeIf { it.isValid }
+        val remembered = restoredEntry
+        restoredEntry = null
         when {
             restore != null -> {
                 rootList.selectIndex(restore.leftIndex)
                 rebuildRight()
                 restoreRightSelection(restore)
                 setActivePane(restore.pane)
+            }
+
+            firstOpen && remembered != null -> {
+                val entry = entries.firstOrNull { it.file == remembered }
+                if (entry == null) rootList.selectIndex(0) else rootList.selectEntry(entry)
+                rebuildRight()
+                val base = rootList.selectedEntry()?.file
+                val file = restoredFile?.takeIf { it.isValid }
+                if (base != null && file != null && VfsUtilCore.isAncestor(base, file, true)) {
+                    treePanel.locate(file, base)
+                }
             }
 
             firstOpen && current != null -> {
@@ -381,7 +416,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                     treePanel.showEmpty()
                 } else {
                     treePanel.showSubtree(dir)
-                    if (autoExpandModule) treePanel.expandToFirstFileLevel()
+                    if (autoExpand) treePanel.expandToFirstFileLevel()
                 }
             }
         }

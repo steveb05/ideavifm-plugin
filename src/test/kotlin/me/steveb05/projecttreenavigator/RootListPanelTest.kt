@@ -21,10 +21,6 @@ class RootListPanelTest : BasePlatformTestCase() {
         assertEquals(entries, panel.entries())
         panel.selectIndex(1)
         assertEquals(entries[1], panel.selectedEntry())
-        panel.move(5)
-        assertEquals(2, panel.selectedIndex())
-        panel.move(-99)
-        assertEquals(0, panel.selectedIndex())
         panel.selectEntry(entries[2])
         assertEquals(2, panel.selectedIndex())
         assertEquals(0, fired)
@@ -42,6 +38,27 @@ class RootListPanelTest : BasePlatformTestCase() {
         )
         panel.setEntries(entries)
         assertEquals(entries[1], panel.entryContaining(file))
+    }
+
+    fun testMovementLoopsAroundTheEnds() {
+        val panel = RootListPanel(project, onUserSelection = { })
+        val entries = threeEntries()
+        panel.setEntries(entries)
+        panel.selectIndex(2)
+        panel.move(1)
+        assertEquals("past the last entry comes the first", 0, panel.selectedIndex())
+        panel.move(-1)
+        assertEquals("and back again", 2, panel.selectedIndex())
+    }
+
+    fun testMovementLoopsOverTheEntriesWithoutMatches() {
+        val panel = RootListPanel(project, onUserSelection = { })
+        val entries = threeEntries()
+        panel.setEntries(entries)
+        panel.setCounts(mapOf(entries[0] to 1, entries[1] to 0, entries[2] to 0))
+        panel.selectIndex(0)
+        panel.move(1)
+        assertEquals("the only entry with matches is the one it lands back on", 0, panel.selectedIndex())
     }
 
     fun testMovementStepsOverEntriesWithoutMatches() {

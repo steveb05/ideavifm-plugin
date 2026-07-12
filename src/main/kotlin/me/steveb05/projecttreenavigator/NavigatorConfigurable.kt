@@ -33,6 +33,14 @@ class NavigatorConfigurable : BoundConfigurable("Project Tree Navigator") {
             checkBox("Show preview pane").bindSelected(settings::showPreview)
         }
         row {
+            checkBox("Open on the last scope and zoom instead of the current file")
+                .bindSelected(settings::restoreLastView)
+                .comment(
+                    "Off: the popup opens on the file you are editing. " +
+                        "On: it opens where you left it, scope, zoom and selection.",
+                )
+        }
+        row {
             comment(
                 "Inside the popup: Ctrl+Period toggles dot files, Alt+P toggles the preview, " +
                     "Alt+C shows only files with VCS changes, Space or Alt+M marks rows for a bulk " +
