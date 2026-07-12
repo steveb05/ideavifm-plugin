@@ -38,7 +38,7 @@ class PreviewContentTest : BasePlatformTestCase() {
         settings.hideDotFiles = true
         try {
             val content = PreviewPanel.computeContent(project, dir) as PreviewPanel.Content.Directory
-            assertEquals(listOf("visible.txt"), content.names)
+            assertEquals(listOf("visible.txt"), content.files.map { it.name })
             assertFalse(content.capped)
         } finally {
             settings.hideDotFiles = before

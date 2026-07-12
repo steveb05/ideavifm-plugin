@@ -12,6 +12,7 @@ import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.ColorUtil
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.Alarm
@@ -30,7 +31,7 @@ class PreviewPanel(private val project: Project) {
         class Source(val document: Document) : Content()
         class Text(val text: String, val truncated: Boolean) : Content()
         class Binary(val name: String, val typeName: String, val length: Long) : Content()
-        class Directory(val names: List<String>, val capped: Boolean) : Content()
+        class Directory(val files: List<VirtualFile>, val capped: Boolean) : Content()
         object Empty : Content()
     }
 
@@ -126,7 +127,7 @@ class PreviewPanel(private val project: Project) {
             )
 
             is Content.Directory -> {
-                val names = content.names.joinToString("<br>") { StringUtil.escapeXmlEntities(it) }
+                val names = content.files.joinToString("<br>") { listingRow(it) }
                 val suffix = if (content.capped) "<br>..." else ""
                 val listing = JBLabel("<html>$names$suffix</html>", SwingConstants.LEFT)
                 listing.verticalAlignment = SwingConstants.TOP
@@ -140,6 +141,15 @@ class PreviewPanel(private val project: Project) {
         }
         panel.revalidate()
         panel.repaint()
+    }
+
+    private fun listingRow(child: VirtualFile): String {
+        val name = StringUtil.escapeXmlEntities(child.name)
+        val color =
+            if (child.isDirectory) VcsStatusColor.forDirectory(project, child)
+            else VcsStatusColor.forFile(project, child)
+        color ?: return name
+        return "<span style=\"color:#${ColorUtil.toHex(color)}\">$name</span>"
     }
 
     private fun installEditor(created: EditorEx, truncated: Boolean) {
@@ -210,8 +220,8 @@ class PreviewPanel(private val project: Project) {
         fun computeContent(project: Project, file: VirtualFile): Content {
             if (!file.isValid) return Content.Empty
             if (file.isDirectory) {
-                val names = BrowseTree.visibleChildren(project, file).map { it.name }
-                return Content.Directory(names.take(MAX_DIR_ENTRIES), names.size > MAX_DIR_ENTRIES)
+                val children = BrowseTree.visibleChildren(project, file)
+                return Content.Directory(children.take(MAX_DIR_ENTRIES), children.size > MAX_DIR_ENTRIES)
             }
             if (file.fileType.isBinary) return Content.Binary(file.name, file.fileType.name, file.length)
             if (file.length <= MAX_BYTES) {

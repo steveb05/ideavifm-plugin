@@ -43,9 +43,11 @@ preview follow the pane you last moved. The active pane carries a
 focus colored outline. Module scope groups Gradle source set modules
 (`main`, `test` and friends) into one view, so test and resource
 folders show up. File and folder names carry the IDE's VCS status
-colors (modified, added, untracked, ignored), and folders containing
-changes are tinted like modified files; `Alt+C` narrows both panes to
-changed files only, composing with search, scopes and zoom.
+colors (modified, added, untracked, ignored) in both panes and in the
+folder listing the preview shows. A folder that contains changes is
+tinted like a modified file however deep they sit, so `src` and the
+module root light up as well. `Alt+C` narrows both panes to changed
+files only, composing with search, scopes and zoom.
 
 The preview opens the file's own document, so it gets the same colors
 as the editor: the lexer keywords plus everything the code analyzer
