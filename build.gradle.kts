@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.16.0"
 }
 
-group = "dev.sb"
+group = "me.steveb05"
 version = "0.1.0"
 
 repositories {
