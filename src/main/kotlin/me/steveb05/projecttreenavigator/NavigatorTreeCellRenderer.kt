@@ -8,6 +8,7 @@ import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.speedSearch.SpeedSearchUtil
 import com.intellij.util.IconUtil
+import java.awt.Color
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 
@@ -53,6 +54,20 @@ class NavigatorTreeCellRenderer(
             )
         } else {
             append(data.name, plain)
+        }
+        statusColor?.let { restoreForeground(it) }
+    }
+
+    /**
+     * A selected row in a pane painted as focused has every fragment rewritten by the platform with the
+     * selection foreground, which drops the VCS status color from the one row the user is standing on.
+     * Putting the color back afterwards keeps a changed file recognizable under the cursor.
+     */
+    private fun restoreForeground(color: Color) {
+        val fragments = iterator()
+        while (fragments.hasNext()) {
+            fragments.next()
+            fragments.textAttributes = fragments.textAttributes.derive(-1, color, null, null)
         }
     }
 }
