@@ -24,6 +24,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -109,6 +110,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private val fileNameSearch = FileNameSearch(project)
     private var alarm: Alarm? = null
 
+    /** Its own alarm: the search one is cancelled wholesale whenever the query changes. */
+    private var focusAlarm: Alarm? = null
+
     fun show() {
         buildPanel()
         val created = JBPopupFactory.getInstance()
@@ -125,6 +129,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         popup = created
         previewPanel.attach(created)
         alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, created)
+        focusAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, created)
         searchField.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) = scheduleRefresh()
         })
@@ -636,10 +641,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .show(RelativePoint(component, point))
     }
 
-    /** The panes never take focus, but the preview editor can, and then typing would go into it. */
+    /**
+     * The panes never take focus, but the preview editor can, and so can the IDE window once a dialog closes
+     * over us. Going through the focus manager rather than the window means the popup can take the focus back
+     * even when its window is no longer the active one.
+     */
     private fun focusSearch() {
         val editor = searchField.textEditor
-        editor.requestFocusInWindow()
+        IdeFocusManager.getInstance(project).requestFocus(editor, true)
         editor.caretPosition = editor.document.length
     }
 
@@ -755,12 +764,23 @@ class NavigatorPopup(private val context: NavigatorContext) {
         if (editors.isFileOpen(file)) editors.closeFile(file)
     }
 
-    /** The dialog hands the focus back to the editor as it closes, so take it back once that has happened. */
+    /**
+     * As the New dialog unwinds, the IDE restores the focus to the window underneath, and that restore can
+     * land after the request below. So the focus is asked for once the dialog is done, and asked for again a
+     * moment later if the IDE took it back in the meantime.
+     */
     private fun returnFocusToSearch() {
         val activePopup = popup ?: return
         ApplicationManager.getApplication().invokeLater(
             { if (!activePopup.isDisposed) focusSearch() },
-            ModalityState.stateForComponent(panel),
+            ModalityState.nonModal(),
+        )
+        focusAlarm?.addRequest(
+            {
+                if (activePopup.isDisposed || searchField.textEditor.hasFocus()) return@addRequest
+                focusSearch()
+            },
+            FOCUS_RETRY_MS,
         )
     }
 
@@ -886,5 +906,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
             extra,
         )
         return notes.joinToString("; ").ifEmpty { null }
+    }
+
+    private companion object {
+        const val FOCUS_RETRY_MS = 150
     }
 }
