@@ -718,9 +718,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     /**
-     * The New actions open what they create themselves, so the editor ends up with the focus. Which of the
-     * two things the user wanted is ours to decide: either follow the new file into the editor and get out of
-     * the way, or keep the navigator up with the new file selected and the caret back in the search field.
+     * Opening what was just created is the IdeView's job, not the New action's: the project view opens it
+     * from its own selectElement. Ours has to say what happens, so either follow the new file into the editor
+     * and get out of the way, or keep the navigator up with the file selected and the caret in the search field.
      */
     private fun selectCreated(file: VirtualFile) {
         if (openCreated && !file.isDirectory) {
@@ -746,13 +746,16 @@ class NavigatorPopup(private val context: NavigatorContext) {
         returnFocusToSearch()
     }
 
-    /** The file was created a moment ago, so a tab for it can only be the one the New action just opened. */
+    /**
+     * Some templates do open the file on their way out. The file was created a moment ago, so a tab for it
+     * can only be that one, and it is the one to close when the file was not meant to open.
+     */
     private fun closeEditorFor(file: VirtualFile) {
         val editors = FileEditorManager.getInstance(project)
         if (editors.isFileOpen(file)) editors.closeFile(file)
     }
 
-    /** The New action hands the focus to the editor after this, so take it back once that has happened. */
+    /** The dialog hands the focus back to the editor as it closes, so take it back once that has happened. */
     private fun returnFocusToSearch() {
         val activePopup = popup ?: return
         ApplicationManager.getApplication().invokeLater(
