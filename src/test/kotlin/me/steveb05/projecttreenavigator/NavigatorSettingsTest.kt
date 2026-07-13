@@ -12,6 +12,7 @@ class NavigatorSettingsTest : TestCase() {
         assertTrue(state.leftPaneChildren)
         assertTrue(state.leftPaneChildFiles)
         assertFalse("the popup opens on the current file unless asked otherwise", state.restoreLastView)
+        assertTrue("creating a file follows it into the editor", state.openCreatedFile)
     }
 
     fun testLoadStateRoundTrip() {
@@ -24,8 +25,10 @@ class NavigatorSettingsTest : TestCase() {
                 leftPaneChildren = false,
                 leftPaneChildFiles = false,
                 restoreLastView = true,
+                openCreatedFile = false,
             ),
         )
+        assertFalse(settings.openCreatedFile)
         assertFalse(settings.hideDotFiles)
         assertFalse(settings.compactFolders)
         assertTrue(settings.showPreview)

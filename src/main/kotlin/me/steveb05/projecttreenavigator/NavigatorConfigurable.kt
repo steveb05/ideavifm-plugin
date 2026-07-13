@@ -33,6 +33,14 @@ class NavigatorConfigurable : BoundConfigurable("Project Tree Navigator") {
             checkBox("Show preview pane").bindSelected(settings::showPreview)
         }
         row {
+            checkBox("Open the file you create")
+                .bindSelected(settings::openCreatedFile)
+                .comment(
+                    "On: creating a file follows it into the editor and closes the popup. Off: the popup " +
+                        "stays up with the new file selected. Shift+Alt+Insert creates the other way round.",
+                )
+        }
+        row {
             checkBox("Open on the last scope and zoom")
                 .bindSelected(settings::restoreLastView)
                 .comment(

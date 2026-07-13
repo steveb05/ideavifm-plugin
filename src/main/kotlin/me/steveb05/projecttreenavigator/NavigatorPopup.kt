@@ -3,6 +3,7 @@ package me.steveb05.projecttreenavigator
 import com.intellij.ide.CopyPasteDelegator
 import com.intellij.ide.IdeView
 import com.intellij.ide.PsiCopyPasteManager
+import com.intellij.ide.util.DeleteHandler
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.LangDataKeys
@@ -86,6 +87,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         override fun getSelectedElements(context: DataContext): Array<PsiElement> = targetElements()
     }
 
+    /** Delete is disabled unless the context carries a provider; this is the one the project view uses. */
+    private val deleteProvider = DeleteHandler.DefaultDeleteProvider()
+
     private var popup: JBPopup? = null
     private var generation = 0
     private var activePane = Pane.RIGHT
@@ -97,6 +101,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var restoredFile: VirtualFile? = null
     private var searchWasActive = false
     private var reopen = false
+    private var openCreated = true
     private var filterMatches: List<FileNameSearch.RankedFile>? = null
     private var namedMatches: List<FileNameSearch.RankedFile>? = null
     private var changedOnly = false
@@ -196,7 +201,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
-        commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement() }
+        commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement(inverted = false) }
+        commands.bind(NavigatorCommand.NEW_ELEMENT_INVERTED) { showNewElement(inverted = true) }
         commands.bind(NavigatorCommand.FOCUS_SEARCH) { focusSearch() }
         commands.bind(NavigatorCommand.RESET_TREE, isEnabled = { searchField.text.isEmpty() }) {
             treePanel.resetToOpenState()
@@ -610,13 +616,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
         refresh()
     }
 
-    private fun showNewElement() {
+    private fun showNewElement(inverted: Boolean) {
         val dataContext = fileActionContext() ?: return
+        openCreated = NavigatorSettings.getInstance().openCreatedFile != inverted
         NavigatorFileActions.perform(NavigatorFileActions.NEW_ELEMENT, dataContext) { }
     }
 
     private fun showContextMenu(component: JComponent, point: Point) {
         val dataContext = fileActionContext() ?: return
+        openCreated = NavigatorSettings.getInstance().openCreatedFile
         JBPopupFactory.getInstance()
             .createActionGroupPopup(
                 null,
@@ -692,6 +700,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .add(PlatformDataKeys.COPY_PROVIDER, copyPaste.copyProvider)
             .add(PlatformDataKeys.CUT_PROVIDER, copyPaste.cutProvider)
             .add(PlatformDataKeys.PASTE_PROVIDER, copyPaste.pasteProvider)
+            .add(PlatformDataKeys.DELETE_ELEMENT_PROVIDER, deleteProvider)
         files.firstOrNull()?.let { builder.add(CommonDataKeys.VIRTUAL_FILE, it) }
         elements.firstOrNull()?.let { builder.add(CommonDataKeys.PSI_ELEMENT, it) }
         return builder.build()
@@ -708,19 +717,48 @@ class NavigatorPopup(private val context: NavigatorContext) {
         return if (valid.isDirectory) valid else valid.parent
     }
 
+    /**
+     * The New actions open what they create themselves, so the editor ends up with the focus. Which of the
+     * two things the user wanted is ours to decide: either follow the new file into the editor and get out of
+     * the way, or keep the navigator up with the new file selected and the caret back in the search field.
+     */
     private fun selectCreated(file: VirtualFile) {
+        if (openCreated && !file.isDirectory) {
+            popup?.closeOk(null)
+            FileEditorManager.getInstance(project).openFile(file, true)
+            return
+        }
+        if (!file.isDirectory) closeEditorFor(file)
         if (searchField.text.isNotEmpty()) searchField.text = ""
         refresh()
-        val entry = rootList.entryContaining(file) ?: return
-        rootList.selectEntry(entry)
-        rebuildRight()
-        if (entry.file == file) {
-            setActivePane(Pane.LEFT)
-        } else {
-            setActivePane(Pane.RIGHT)
-            treePanel.locate(file, entry.file)
+        val entry = rootList.entryContaining(file)
+        if (entry != null) {
+            rootList.selectEntry(entry)
+            rebuildRight()
+            if (entry.file == file) {
+                setActivePane(Pane.LEFT)
+            } else {
+                setActivePane(Pane.RIGHT)
+                treePanel.locate(file, entry.file)
+            }
+            refreshPreview()
         }
-        refreshPreview()
+        returnFocusToSearch()
+    }
+
+    /** The file was created a moment ago, so a tab for it can only be the one the New action just opened. */
+    private fun closeEditorFor(file: VirtualFile) {
+        val editors = FileEditorManager.getInstance(project)
+        if (editors.isFileOpen(file)) editors.closeFile(file)
+    }
+
+    /** The New action hands the focus to the editor after this, so take it back once that has happened. */
+    private fun returnFocusToSearch() {
+        val activePopup = popup ?: return
+        ApplicationManager.getApplication().invokeLater(
+            { if (!activePopup.isDisposed) focusSearch() },
+            ModalityState.stateForComponent(panel),
+        )
     }
 
     private inner class PopupIdeView(private val dir: PsiDirectory) : IdeView {

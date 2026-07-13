@@ -32,6 +32,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | The IDE New menu for the selected folder (file templates included) |
+| `Shift+Alt+Insert` | The same, creating the other way round: opens what you create if the setting says not to, and the other way about |
 | `Space` (empty query) or `Alt+M` | Mark or unmark the row; marked rows are bold and survive navigation |
 | `Shift+F6` / `F6` | Rename / move the target (IDE refactoring, references are updated) |
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy, cut, paste files (empty query; paste falls back to text when the clipboard holds no files) |
@@ -75,6 +76,12 @@ as the editor: the lexer keywords plus everything the code analyzer
 contributes (soft keywords such as `private`, annotations, declarations
 and references). Files over 100 KB fall back to a truncated, lexer only
 preview.
+
+Creating a file follows it into the editor and closes the popup, which
+is the "Open the file you create" setting (default on). Turn it off, or
+press `Shift+Alt+Insert` once, and the popup stays up with the new file
+selected in the tree and the caret back in the search field, with
+nothing left open in the editor.
 
 File operations delegate to the IDE, so renaming a class file runs the
 rename refactoring and moving updates imports. They act on the marked

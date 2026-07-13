@@ -26,6 +26,7 @@ enum class NavigatorCommand(val actionId: String) {
     FOCUS_SEARCH("ProjectTreeNavigator.FocusSearch"),
     RESET_TREE("ProjectTreeNavigator.ResetTree"),
     NEW_ELEMENT(NavigatorFileActions.NEW_ELEMENT),
+    NEW_ELEMENT_INVERTED("ProjectTreeNavigator.NewElementInverted"),
     PREVIEW_LINE_DOWN("ProjectTreeNavigator.PreviewLineDown"),
     PREVIEW_LINE_UP("ProjectTreeNavigator.PreviewLineUp"),
     PREVIEW_HALF_DOWN("ProjectTreeNavigator.PreviewHalfDown"),
