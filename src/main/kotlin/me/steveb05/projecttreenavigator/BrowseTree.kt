@@ -12,6 +12,7 @@ data class NavigatorNodeData(
     val name: String,
     val isDirectory: Boolean,
     val weight: Int = 0,
+    val declarations: List<Declaration> = emptyList(),
 )
 
 object BrowseTree {

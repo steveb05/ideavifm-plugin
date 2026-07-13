@@ -1,9 +1,11 @@
 package me.steveb05.projecttreenavigator
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -43,6 +45,7 @@ class PreviewPanel(private val project: Project) {
     private var alarm: Alarm? = null
     private var generation = 0
     private var target: VirtualFile? = null
+    private var targetOffset: Int? = null
 
     /**
      * Building a viewer costs an editor and a highlighting pass, which is what makes scrolling through files
@@ -70,12 +73,14 @@ class PreviewPanel(private val project: Project) {
         showLabel("No preview")
     }
 
-    fun setTarget(file: VirtualFile?) {
-        if (file == target) return
+    /** [offset] is where the file matched a search, so the preview opens on it rather than at the top. */
+    fun setTarget(file: VirtualFile?, offset: Int? = null) {
+        if (file == target && offset == targetOffset) return
         target = file
+        targetOffset = offset
         val activeAlarm = alarm ?: return
         activeAlarm.cancelAllRequests()
-        activeAlarm.addRequest({ load(file) }, LOAD_DELAY_MS)
+        activeAlarm.addRequest({ load(file, offset) }, LOAD_DELAY_MS)
     }
 
     fun setActive(active: Boolean) {
@@ -106,7 +111,7 @@ class PreviewPanel(private val project: Project) {
 
     private fun scrollBar(): JScrollBar? = scrollable?.verticalScrollBar
 
-    private fun load(file: VirtualFile?) {
+    private fun load(file: VirtualFile?, offset: Int?) {
         val activePopup = popup ?: return
         val gen = ++generation
         if (file == null || !file.isValid) {
@@ -119,8 +124,25 @@ class PreviewPanel(private val project: Project) {
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { content ->
                 if (gen != generation) return@finishOnUiThread
                 apply(content, file)
+                offset?.let { reveal(it) }
             }
             .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    /**
+     * The viewer is mounted but not laid out yet, and a scrolling model with no viewport to measure scrolls
+     * nowhere, so the reveal is asked for again once the layout has run.
+     */
+    private fun reveal(offset: Int) {
+        val active = editor ?: return
+        if (offset <= 0 || offset >= active.document.textLength) return
+        active.caretModel.moveToOffset(offset)
+        active.scrollingModel.scrollToCaret(ScrollType.CENTER)
+        val gen = generation
+        ApplicationManager.getApplication().invokeLater({
+            if (gen != generation || editor !== active) return@invokeLater
+            active.scrollingModel.scrollToCaret(ScrollType.CENTER)
+        }, ModalityState.stateForComponent(panel))
     }
 
     private fun apply(content: Content, file: VirtualFile) {

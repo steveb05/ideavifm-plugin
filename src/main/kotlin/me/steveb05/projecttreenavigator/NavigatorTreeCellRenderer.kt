@@ -57,6 +57,27 @@ class NavigatorTreeCellRenderer(
             append(data.name, plain)
         }
         statusColor?.let { restoreForeground(it) }
+        appendDeclarations(data.declarations, highlight)
+    }
+
+    /**
+     * Why a file the query never names is on the list: the classes inside it that the query does name. They trail
+     * the file name in gray, after the status color has been put back, so the suffix stays a footnote and
+     * does not claim the row's VCS color.
+     */
+    private fun appendDeclarations(declarations: List<Declaration>, highlight: QueryHighlight?) {
+        if (declarations.isEmpty()) return
+        val gray = SimpleTextAttributes.GRAYED_ATTRIBUTES
+        val lit = gray.derive(SimpleTextAttributes.STYLE_SEARCH_MATCH, null, null, null)
+        append("  ", gray)
+        for ((index, declaration) in declarations.take(MAX_SHOWN).withIndex()) {
+            if (index > 0) append(", ", gray)
+            val fragments = highlight?.forDeclaration(declaration.name)
+            if (fragments == null) append(declaration.name, gray)
+            else SpeedSearchUtil.appendColoredFragments(this, declaration.name, fragments, gray, lit)
+        }
+        val hidden = declarations.size - MAX_SHOWN
+        if (hidden > 0) append(" +$hidden", gray)
     }
 
     /**
@@ -70,5 +91,9 @@ class NavigatorTreeCellRenderer(
             fragments.next()
             fragments.textAttributes = fragments.textAttributes.derive(-1, color, null, null)
         }
+    }
+
+    private companion object {
+        const val MAX_SHOWN = 3
     }
 }

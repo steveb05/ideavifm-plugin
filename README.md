@@ -15,7 +15,7 @@ Press `Ctrl+Alt+E` (remappable: Settings, Keymap, "Project Tree Navigator").
 
 | Key | Action |
 | --- | --- |
-| type | Fuzzy search the whole scope: one query spans folders and file names (`docbui` finds `_DocsExtension/build.gradle.kts`) and the matched letters are lit up in both panes; the left pane shows per entry match counts and grays out the entries with none, the right pane shows the selected entry's matches |
+| type | Fuzzy search the whole scope: one query spans folders, file names and the classes declared inside the files (`docbui` finds `_DocsExtension/build.gradle.kts`, `bob` finds `People.kt`, which declares `Bob`) and the matched letters are lit up in both panes; the left pane shows per entry match counts and grays out the entries with none, the right pane shows the selected entry's matches |
 | `Alt+J` / `Alt+K` | Move the left pane selection; the right pane refills live |
 | `Ctrl+J` / `Ctrl+K` | Move the right pane selection |
 | `Down` / `Up` | Move the active pane selection; in the preview, scroll one line |
@@ -62,7 +62,18 @@ camel hump, a part after `_`, `-` or `.`). That is what keeps the
 scattered d, o and c of `adapters/loot/config` from dragging in every
 `build.gradle.kts`. Spell a query with a slash (`api/usrv`) to match
 the path literally. Files whose own name matches rank above files
-matched through their folders. Module scope groups Gradle source set modules
+matched through their folders.
+
+A query also matches the classes, interfaces and objects declared
+inside the files, taken from the same index the IDE's Go to Class
+reads, so `bob` finds `People.kt` when `Bob` is one of the classes in
+it. Those classes trail the file name in gray on the row, with the
+matched letters lit (`People.kt  Bob, Bobby`), and the preview opens on
+the class rather than at the top of the file, as does `Enter`. A file
+reached only through a class it declares ranks below every file the
+query names and above the ones matched through their folders. Single
+letter queries are left to the file names, since one letter matches a
+class in almost every file. Module scope groups Gradle source set modules
 (`main`, `test` and friends) into one view, so test and resource
 folders show up. File and folder names carry the IDE's VCS status
 colors (modified, added, untracked, ignored) in both panes and in the

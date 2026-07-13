@@ -15,19 +15,16 @@ import com.intellij.psi.search.GlobalSearchScope
 
 class FileNameSearch(private val project: Project) {
 
-    data class RankedFile(val file: VirtualFile, val weight: Int)
-    data class Result(val files: List<RankedFile>, val truncated: Boolean)
-
     /**
      * A file matches when its name matches the query loosely, letter by letter, or when its path does, which
      * lets one query span folders and file name ("docbui" finds _DocsExtension/build.gradle.kts). Path
      * matching keeps the query's letters together in each segment, otherwise the scattered letters of a long
      * folder chain would match nearly anything. Name matches outrank folder ones.
      */
-    fun search(rawQuery: String, scope: GlobalSearchScope, limit: Int = DEFAULT_LIMIT): Result {
+    fun search(rawQuery: String, scope: GlobalSearchScope, limit: Int = DEFAULT_LIMIT): SearchResult {
         ApplicationManager.getApplication().assertReadAccessAllowed()
         val query = rawQuery.trim().trim('/')
-        if (query.isEmpty()) return Result(emptyList(), false)
+        if (query.isEmpty()) return SearchResult(emptyList(), false)
 
         val index = ProjectFileIndex.getInstance(project)
         val base = project.guessProjectDir()
@@ -44,8 +41,8 @@ class FileNameSearch(private val project: Project) {
         )
 
         ranked.sortByDescending { it.weight }
-        if (ranked.size > limit) return Result(ranked.subList(0, limit).toList(), true)
-        return Result(ranked, false)
+        if (ranked.size > limit) return SearchResult(ranked.subList(0, limit).toList(), true)
+        return SearchResult(ranked, false)
     }
 
     /**

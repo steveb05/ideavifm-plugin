@@ -37,7 +37,7 @@ class TreePanel(
     highlightProvider: () -> QueryHighlight?,
     private val onActivate: () -> Unit,
     private val onCommit: () -> Unit,
-    private val onHover: (VirtualFile) -> Unit = {},
+    private val onHover: (NavigatorNodeData) -> Unit = {},
     private val onSelectionChanged: () -> Unit = {},
     private val onContextMenu: (JComponent, Point) -> Unit = { _, _ -> },
 ) {
@@ -87,7 +87,7 @@ class TreePanel(
                 val data =
                     ((path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? NavigatorNodeData)
                         ?: return
-                data.file?.let(onHover)
+                if (data.file != null) onHover(data)
             }
         })
     }
@@ -128,14 +128,14 @@ class TreePanel(
         tree.model = DefaultTreeModel(DefaultMutableTreeNode(NavigatorNodeData(null, "", true)))
     }
 
-    fun showPruned(ranked: List<FileNameSearch.RankedFile>, base: VirtualFile?) {
+    fun showPruned(ranked: List<RankedFile>, base: VirtualFile?) {
         marked.clear()
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base?.name.orEmpty(), true))
         if (base != null) {
             val prunedMatches = ranked.mapNotNull { m ->
                 val relative = VfsUtilCore.getRelativePath(m.file, base) ?: return@mapNotNull null
                 if (relative.isEmpty()) return@mapNotNull null
-                PrunedMatch(relative.split('/'), m.file, m.weight)
+                PrunedMatch(relative.split('/'), m, m.weight)
             }
             val built = PrunedTreeBuilder.build(prunedMatches)
             val display =
@@ -285,15 +285,17 @@ class TreePanel(
         model().removeNodeFromParent(node)
     }
 
-    private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<VirtualFile>>) {
+    private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<RankedFile>>) {
         val parentFile = (parent.userObject as NavigatorNodeData).file
         for (n in nodes) {
-            val file = n.payload ?: n.name.split('/').fold(parentFile) { acc, segment -> acc?.findChild(segment) }
+            val match = n.payload
+            val file = match?.file
+                ?: n.name.split('/').fold(parentFile) { acc, segment -> acc?.findChild(segment) }
             val child = DefaultMutableTreeNode(
-                NavigatorNodeData(file, n.name, n.payload == null, n.weight),
+                NavigatorNodeData(file, n.name, match == null, n.weight, match?.declarations.orEmpty()),
             )
             parent.add(child)
-            if (n.payload == null) appendPruned(child, n.children)
+            if (match == null) appendPruned(child, n.children)
         }
     }
 

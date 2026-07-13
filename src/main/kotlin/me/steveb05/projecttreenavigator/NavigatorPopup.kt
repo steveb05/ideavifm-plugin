@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.guessProjectDir
@@ -103,11 +104,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var searchWasActive = false
     private var reopen = false
     private var openCreated = true
-    private var filterMatches: List<FileNameSearch.RankedFile>? = null
-    private var namedMatches: List<FileNameSearch.RankedFile>? = null
+    private var filterMatches: List<RankedFile>? = null
+    private var namedMatches: List<RankedFile>? = null
     private var changedOnly = false
     private var footerNote: String? = null
     private val fileNameSearch = FileNameSearch(project)
+    private val declarationSearch = DeclarationSearch(project)
     private var alarm: Alarm? = null
 
     /** Its own alarm: the search one is cancelled wholesale whenever the query changes. */
@@ -285,18 +287,27 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun refreshPreview() {
         if (!NavigatorSettings.getInstance().showPreview) return
-        val file = when (activePane) {
-            Pane.LEFT -> rootList.selectedEntry()?.file
-            Pane.RIGHT -> treePanel.selectedFile()
-            Pane.PREVIEW -> treePanel.selectedFile()
+        if (activePane == Pane.LEFT) {
+            previewPanel.setTarget(rootList.selectedEntry()?.file)
+            return
         }
-        previewPanel.setTarget(file)
+        val data = treePanel.selectedData()
+        previewPanel.setTarget(data?.file, declarationOffset(data))
     }
 
     private fun previewHover(file: VirtualFile) {
         if (!NavigatorSettings.getInstance().showPreview) return
         previewPanel.setTarget(file)
     }
+
+    private fun previewHover(data: NavigatorNodeData) {
+        if (!NavigatorSettings.getInstance().showPreview) return
+        previewPanel.setTarget(data.file, declarationOffset(data))
+    }
+
+    /** Where a file the query reached through a class it declares should open: on that class. */
+    private fun declarationOffset(data: NavigatorNodeData?): Int? =
+        data?.takeUnless { it.isDirectory }?.declarations?.firstOrNull()?.offset
 
     private fun togglePreview() {
         val settings = NavigatorSettings.getInstance()
@@ -453,9 +464,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun bucketFor(
-        matches: List<FileNameSearch.RankedFile>,
+        matches: List<RankedFile>,
         entry: BaseEntry?,
-    ): List<FileNameSearch.RankedFile> =
+    ): List<RankedFile> =
         entry?.let { SubtreeMatches.matchesUnder(matches, it) { m -> m.file } }.orEmpty()
 
     private fun runFilterSearch(query: String, resolved: ScopeResolver.Resolved) {
@@ -471,14 +482,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
-        ReadAction.nonBlocking<FileNameSearch.Result> {
+        ReadAction.nonBlocking<SearchResult> {
             val changed = if (changedOnly) changedFileSet() else null
-            val raw = fileNameSearch.search(query, searchScope)
-            FileNameSearch.Result(
-                raw.files.filter {
-                    !BrowseTree.hiddenByDotRule(project, it.file) && (changed == null || it.file in changed)
-                },
-                raw.truncated,
+            val shown = { file: VirtualFile ->
+                !BrowseTree.hiddenByDotRule(project, file) && (changed == null || file in changed)
+            }
+            val named = fileNameSearch.search(query, searchScope)
+            NavigatorSearch.merge(
+                SearchResult(named.files.filter { shown(it.file) }, named.truncated),
+                declarationSearch.search(query, searchScope).filterKeys(shown),
             )
         }
             .coalesceBy(this)
@@ -509,11 +521,11 @@ class NavigatorPopup(private val context: NavigatorContext) {
         namedMatches = null
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
-        ReadAction.nonBlocking<List<FileNameSearch.RankedFile>> {
+        ReadAction.nonBlocking<List<RankedFile>> {
             changedFileSet()
                 .filter { searchScope.contains(it) && !BrowseTree.hiddenByDotRule(project, it) }
                 .sortedBy { it.path }
-                .map { FileNameSearch.RankedFile(it, 0) }
+                .map { RankedFile(it, 0) }
         }
             .coalesceBy(this)
             .expireWith(activePopup)
@@ -558,7 +570,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 val zoomed = zoomStack.lastOrNull()?.dir
                 val files = result.files
                     .filter { zoomed == null || VfsUtilCore.isAncestor(zoomed, it, false) }
-                    .map { FileNameSearch.RankedFile(it, 0) }
+                    .map { RankedFile(it, 0) }
                 val allEntries = effectiveEntries(resolved)
                 namedMatches = files
                 val entries = allEntries.filter { SubtreeMatches.matchesUnder(files, it) { m -> m.file }.isNotEmpty() }
@@ -859,7 +871,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
             return
         }
         popup?.closeOk(null)
-        FileEditorManager.getInstance(project).openFile(file, true)
+        val offset = declarationOffset(data)
+        if (offset == null) {
+            FileEditorManager.getInstance(project).openFile(file, true)
+            return
+        }
+        OpenFileDescriptor(project, file, offset).navigate(true)
     }
 
     private fun activeSelectedDirectory(): VirtualFile? = when (activePane) {

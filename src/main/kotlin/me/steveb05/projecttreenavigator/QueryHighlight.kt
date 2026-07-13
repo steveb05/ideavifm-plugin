@@ -23,6 +23,10 @@ class QueryHighlight(rawQuery: String, private val base: VirtualFile?) {
     fun forDirectory(file: VirtualFile?, name: String): Iterable<TextRange>? =
         shownPart(file, name) { path -> longestHeadOn(path) }
 
+    /** A declared class is matched by its own name, the way the file names in the same row are. */
+    fun forDeclaration(name: String): Iterable<TextRange>? =
+        nameMatcher.matchingFragments(name)?.takeIf { it.isNotEmpty() }
+
     private fun longestHeadOn(path: String): List<TextRange>? {
         val shortest = minOf(MIN_HEAD, query.length)
         for (length in query.length downTo shortest) {
