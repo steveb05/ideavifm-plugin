@@ -63,4 +63,48 @@ class OpenTargetTest : BasePlatformTestCase() {
         val docs = entries[2].file
         assertEquals(docs, OpenTarget.landing(docs, docs))
     }
+
+    fun testASearchStaysInTheFolderItIsRunFrom() {
+        val best = myFixture.findFileInTempDir("extensions/src/Vault.kt")
+        val counts = mapOf(entries[0] to 1, entries[1] to 9, entries[2] to 0)
+        assertEquals(
+            "the selected folder still holds a match, so the query narrows it rather than leaving it",
+            entries[0],
+            OpenTarget.searchLanding(entries, counts, selected = entries[0], best = best),
+        )
+    }
+
+    fun testASearchMovesOnceTheSelectedFolderHasNothingLeft() {
+        val best = myFixture.findFileInTempDir("extensions/src/Vault.kt")
+        val counts = mapOf(entries[0] to 0, entries[1] to 9, entries[2] to 0)
+        assertEquals(
+            entries[1],
+            OpenTarget.searchLanding(entries, counts, selected = entries[0], best = best),
+        )
+    }
+
+    fun testAQueryThatMatchesNowhereLeavesTheSelectionAlone() {
+        val counts = entries.associateWith { 0 }
+        assertEquals(
+            "the next letter typed may bring the matches back, so the view holds still",
+            entries[2],
+            OpenTarget.searchLanding(entries, counts, selected = entries[2], best = null),
+        )
+    }
+
+    fun testWithNothingSelectedASearchLandsOnItsBestMatch() {
+        val best = myFixture.findFileInTempDir("docs/readme.md")
+        val counts = mapOf(entries[0] to 0, entries[1] to 0, entries[2] to 1)
+        assertEquals(
+            entries[2],
+            OpenTarget.searchLanding(entries, counts, selected = null, best = best),
+        )
+    }
+
+    fun testWithNothingSelectedAndNothingFoundItTakesTheTopEntry() {
+        assertEquals(
+            entries[0],
+            OpenTarget.searchLanding(entries, emptyMap(), selected = null, best = null),
+        )
+    }
 }

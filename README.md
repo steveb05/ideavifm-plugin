@@ -88,6 +88,10 @@ file reached only through a class ranks below the ones the query names and above
 the ones matched through their folders. Single letter queries are left to file
 names, since one letter matches a class in almost every file.
 
+The left pane keeps the folder you are searching in: typing narrows what you
+are already looking at, and the selection only leaves that folder once nothing
+in it matches any more.
+
 Module scope groups a module's Gradle source sets (`main`, `test` and friends)
 into one view, so test and resource folders show up alongside `main`. Custom
 scopes from Settings, Appearance and Behavior, Scopes appear as extra chips

@@ -519,12 +519,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 if (gen != generation) return@finishOnUiThread
                 currentHighlight = QueryHighlight(query, searchBase)
                 filterMatches = result.files
+                val counts = SubtreeMatches.countsFor(result.files, entries) { it.file }
                 rootList.setEntries(entries)
-                rootList.setCounts(SubtreeMatches.countsFor(result.files, entries) { it.file })
-                val best = result.files.firstOrNull()
-                val bestEntry = best?.let { rootList.entryContaining(it.file) }
-                if (bestEntry != null) rootList.selectEntry(bestEntry)
-                else if (rootList.selectedEntry() == null) rootList.selectIndex(0)
+                rootList.setCounts(counts)
+                OpenTarget.searchLanding(
+                    entries,
+                    counts,
+                    rootList.selectedEntry(),
+                    result.files.firstOrNull()?.file,
+                )?.let { rootList.selectEntry(it) }
                 rebuildRight()
                 updateFooter(
                     if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"

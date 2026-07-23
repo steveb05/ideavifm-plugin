@@ -23,6 +23,23 @@ object OpenTarget {
         return entries.firstOrNull()
     }
 
+    /**
+     * Which entry a search lands on. Typing narrows what you are already looking at, so an entry that still
+     * holds matches keeps the selection however good a match another folder turned up. The query moves the
+     * selection only when the entry it sits on has nothing left in it, and it moves nothing at all while the
+     * query matches nowhere, since the next letter typed may well bring the matches back.
+     */
+    fun searchLanding(
+        entries: List<BaseEntry>,
+        counts: Map<BaseEntry, Int>,
+        selected: BaseEntry?,
+        best: VirtualFile?,
+    ): BaseEntry? {
+        if (selected != null && counts.getOrDefault(selected, 0) > 0) return selected
+        best?.let { file -> containing(entries, file)?.let { return it } }
+        return selected ?: entries.firstOrNull()
+    }
+
     /** Which file the tree walks open to inside [base]: the first of the candidates that lives under it. */
     fun landing(base: VirtualFile, vararg candidates: VirtualFile?): VirtualFile? =
         candidates.filterNotNull()
