@@ -35,7 +35,7 @@ default; both toggle off.
 | --- | --- |
 | type | Filter the scope. Matched letters light up; the left pane shows per entry match counts and grays out entries with none |
 | `Alt+J` / `Alt+K` | Move the left pane selection; the right pane refills |
-| `Ctrl+J` / `Ctrl+K` | Move the right pane selection |
+| `Ctrl+J` / `Ctrl+K` | Move the right pane selection; while a query is showing, from match to match |
 | `Down` / `Up` | Move the active pane; in the preview, scroll one line |
 | `Ctrl+H` (`Left` when the query is empty) | Collapse or walk to the parent; at a top level row, cross into the left pane; from the preview, return to the tree |
 | `Ctrl+L` (`Right` when the query is empty) | Expand the folder; from the left pane, enter the right pane; on a file with the preview open, focus it |
@@ -88,9 +88,11 @@ file reached only through a class ranks below the ones the query names and above
 the ones matched through their folders. Single letter queries are left to file
 names, since one letter matches a class in almost every file.
 
-The left pane keeps the folder you are searching in: typing narrows what you
-are already looking at, and the selection only leaves that folder once nothing
-in it matches any more.
+While a query is showing, the right pane's folder rows are there to say where a
+match lives rather than as results of their own, so `Ctrl+J` and `Ctrl+K` step
+from match to match and pass over them. The left pane keeps the folder you are
+searching in: typing narrows what you are already looking at, and the selection
+only leaves that folder once nothing in it matches any more.
 
 Module scope groups a module's Gradle source sets (`main`, `test` and friends)
 into one view, so test and resource folders show up alongside `main`. Custom

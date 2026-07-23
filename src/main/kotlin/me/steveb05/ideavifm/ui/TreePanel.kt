@@ -56,6 +56,9 @@ class TreePanel(
     private val tree = Tree()
     private val marked = LinkedHashSet<VirtualFile>()
 
+    /** Set while the pane shows what a query found, where the folder rows are scaffolding rather than results. */
+    private var matchesOnly = false
+
     val component: JComponent = JBScrollPane(tree)
 
     init {
@@ -128,17 +131,24 @@ class TreePanel(
 
     fun showSubtree(base: VirtualFile) {
         marked.clear()
+        matchesOnly = false
         tree.model = BrowseTree.createSubtreeModel(project, base)
         if (tree.rowCount > 0) tree.setSelectionRow(0)
     }
 
     fun showEmpty() {
         marked.clear()
+        matchesOnly = false
         tree.model = DefaultTreeModel(DefaultMutableTreeNode(NavigatorNodeData(null, "", true)))
     }
 
-    fun showPruned(ranked: List<RankedFile>, base: VirtualFile?) {
+    /**
+     * [matchesOnly] says the rows come from a query rather than from browsing, which is what makes the folder
+     * rows scaffolding: they are on screen to say where the matches live, not as results of their own.
+     */
+    fun showPruned(ranked: List<RankedFile>, base: VirtualFile?, matchesOnly: Boolean = false) {
         marked.clear()
+        this.matchesOnly = matchesOnly
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base?.name.orEmpty(), true))
         if (base != null) {
             val prunedMatches = ranked.mapNotNull { m ->
@@ -196,13 +206,38 @@ class TreePanel(
         val rowCount = tree.rowCount
         if (rowCount == 0) return
         val current = tree.selectionRows?.firstOrNull() ?: -1
-        val next = (current + delta).coerceIn(0, rowCount - 1)
+        val next =
+            if (matchesOnly) nextMatchRow(current, delta)
+            else (current + delta).coerceIn(0, rowCount - 1)
+        if (next < 0) return
         tree.setSelectionRow(next)
         tree.scrollRowToVisible(next)
     }
 
+    /**
+     * Where a step lands while a query is showing: on the next match, over the folders that only hold it.
+     * A step off either end stays on the outermost match rather than wrapping, the way browsing does.
+     */
+    private fun nextMatchRow(current: Int, delta: Int): Int {
+        val rows = matchRows()
+        if (rows.isEmpty()) return -1
+        val position = rows.indexOf(current)
+        if (position >= 0) return rows[(position + delta).coerceIn(0, rows.lastIndex)]
+        if (delta < 0) return rows.lastOrNull { it < current } ?: rows.first()
+        return rows.firstOrNull { it > current } ?: rows.last()
+    }
+
+    private fun matchRows(): List<Int> = (0 until tree.rowCount).filter { isMatchRow(it) }
+
+    private fun isMatchRow(row: Int): Boolean {
+        val node = tree.getPathForRow(row)?.lastPathComponent as? DefaultMutableTreeNode ?: return false
+        return nodeData(node)?.isDirectory == false
+    }
+
     fun selectFirstRowIfNone() {
-        if (tree.selectionPath == null && tree.rowCount > 0) tree.setSelectionRow(0)
+        if (tree.selectionPath != null || tree.rowCount == 0) return
+        val row = if (matchesOnly) matchRows().firstOrNull() ?: return else 0
+        tree.setSelectionRow(row)
     }
 
     fun selectBestMatch() {

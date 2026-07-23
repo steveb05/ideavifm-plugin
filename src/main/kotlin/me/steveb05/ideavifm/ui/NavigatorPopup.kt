@@ -464,7 +464,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val named = namedMatches
         when {
             filter != null -> {
-                treePanel.showPruned(bucketFor(filter, entry), entry?.file)
+                treePanel.showPruned(bucketFor(filter, entry), entry?.file, matchesOnly = searchActive())
                 treePanel.expandAll()
                 treePanel.setEmptyText("Nothing found")
                 treePanel.selectBestMatch()
@@ -489,6 +489,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         refreshPreview()
     }
+
+    /** A query is running; the changed files view and the named scopes fill the panes with an empty one. */
+    private fun searchActive(): Boolean = searchField.text.trim().isNotEmpty()
 
     private fun bucketFor(
         matches: List<RankedFile>,
