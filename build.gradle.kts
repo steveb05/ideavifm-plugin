@@ -6,8 +6,14 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.16.0"
 }
 
+fun gitShortHash(): String = runCatching {
+    providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+    }.standardOutput.asText.get().trim()
+}.getOrNull()?.takeIf(String::isNotEmpty) ?: "dev"
+
 group = "me.steveb05"
-version = "0.1.0"
+version = "1.0.0+${gitShortHash()}"
 
 repositories {
     mavenCentral()
