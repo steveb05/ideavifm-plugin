@@ -27,7 +27,11 @@ object NavigatorFileActions {
         onDone()
     }
 
-    fun contextGroup(): ActionGroup {
+    /**
+     * The concrete group rather than the [ActionGroup] interface: reading a group's children back is only
+     * offered by this one, since [ActionGroup.getChildren] is there for subclasses to implement, not to call.
+     */
+    fun contextGroup(): DefaultActionGroup {
         val manager = ActionManager.getInstance()
         val group = DefaultActionGroup()
         val sections = listOf(

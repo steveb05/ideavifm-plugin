@@ -136,7 +136,7 @@ class ScopeResolverTest : BasePlatformTestCase() {
         myFixture.addFileToProject("cbase/a/b/x.txt", "")
         myFixture.addFileToProject("cbase/top.txt", "")
         val base = myFixture.findFileInTempDir("cbase")
-        withCompact(enabled = true) {
+        withCompact {
             val entries = ScopeResolver.entriesForBase(project, base)
             assertEquals(listOf("a/b", "top.txt"), entries.map { it.name })
             assertEquals(myFixture.findFileInTempDir("cbase/a/b"), entries.first().file)
@@ -200,10 +200,10 @@ class ScopeResolverTest : BasePlatformTestCase() {
         }
     }
 
-    private fun withCompact(enabled: Boolean, block: () -> Unit) {
+    private fun withCompact(block: () -> Unit) {
         val settings = NavigatorSettings.getInstance()
         val before = settings.compactFolders
-        settings.compactFolders = enabled
+        settings.compactFolders = true
         try {
             block()
         } finally {

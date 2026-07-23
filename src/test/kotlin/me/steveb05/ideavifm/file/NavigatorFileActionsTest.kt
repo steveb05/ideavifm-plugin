@@ -23,11 +23,9 @@ class NavigatorFileActionsTest : BasePlatformTestCase() {
     }
 
     fun testContextGroupOffersEverySectionSeparated() {
-        val children = NavigatorFileActions.contextGroup()
-            .getChildren(null)
-            .filterNot { it is Separator }
-        assertEquals(7, children.size)
-        assertEquals(3, NavigatorFileActions.contextGroup().getChildren(null).count { it is Separator })
+        val children = NavigatorFileActions.contextGroup().getChildren(ActionManager.getInstance())
+        assertEquals(7, children.count { it !is Separator })
+        assertEquals(3, children.count { it is Separator })
     }
 
     fun testUnknownActionIsIgnored() {

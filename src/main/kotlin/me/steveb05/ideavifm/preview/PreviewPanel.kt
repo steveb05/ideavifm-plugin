@@ -73,7 +73,7 @@ class PreviewPanel(private val project: Project) {
         this.popup = popup
         alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, popup)
         Disposer.register(popup) { releaseEditors() }
-        showLabel("No preview")
+        showNoPreview()
     }
 
     /** [offset] is where the file matched a search, so the preview opens on it rather than at the top. */
@@ -118,7 +118,7 @@ class PreviewPanel(private val project: Project) {
         val activePopup = popup ?: return
         val gen = ++generation
         if (file == null || !file.isValid) {
-            showLabel("No preview")
+            showNoPreview()
             return
         }
         ReadAction.nonBlocking<Content> { computeContent(project, file) }
@@ -180,7 +180,7 @@ class PreviewPanel(private val project: Project) {
                 panel.addToCenter(pane)
             }
 
-            Content.Empty -> showCentered("No preview")
+            Content.Empty -> showCentered(NO_PREVIEW)
         }
         panel.revalidate()
         panel.repaint()
@@ -208,11 +208,11 @@ class PreviewPanel(private val project: Project) {
         panel.addToBottom(note)
     }
 
-    private fun showLabel(text: String) {
+    private fun showNoPreview() {
         detachEditor()
         panel.removeAll()
         scrollable = null
-        showCentered(text)
+        showCentered(NO_PREVIEW)
         panel.revalidate()
         panel.repaint()
     }
@@ -235,6 +235,7 @@ class PreviewPanel(private val project: Project) {
     }
 
     companion object {
+        const val NO_PREVIEW = "No preview"
         const val MAX_BYTES = 100 * 1024
         const val MAX_LINES = 300
         const val MAX_DIR_ENTRIES = 100
