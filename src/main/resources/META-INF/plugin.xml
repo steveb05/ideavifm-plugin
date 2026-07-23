@@ -3,7 +3,18 @@
     <name>IdeaVifm</name>
     <vendor>steveb05</vendor>
     <description><![CDATA[
-        Keyboard driven popup for navigating the project file tree with Search Everywhere style filtering, scope chips, and folder zoom.
+        <p>
+            IdeaVifm is a keyboard driven file navigator for IntelliJ IDEA, inspired by the
+            <a href="https://vifm.info/">vifm</a> terminal file manager. It opens a popup over the
+            editor where you filter the project tree as you type and move around with vim style keys.
+        </p>
+        <ul>
+            <li>Filter the whole scope as you type, matching folder names, file names, and the classes each file declares.</li>
+            <li>A two pane layout with an optional ranger style preview that uses the editor's own syntax colors.</li>
+            <li>Project, Module, Folder and custom scopes, with folder zoom.</li>
+            <li>VCS status colors in both panes and a changed files only view.</li>
+            <li>New, rename, move, copy, cut, paste and delete, delegated to the IDE's own actions.</li>
+        </ul>
     ]]></description>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
