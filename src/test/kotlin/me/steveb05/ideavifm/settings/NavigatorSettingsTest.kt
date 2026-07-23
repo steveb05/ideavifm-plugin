@@ -9,6 +9,7 @@ class NavigatorSettingsTest : TestCase() {
         assertTrue(state.hideDotFiles)
         assertTrue(state.compactFolders)
         assertFalse(state.showPreview)
+        assertFalse("the mouse crossing a pane must not replace what is being read", state.previewOnHover)
         assertTrue(state.leftPaneChildren)
         assertTrue(state.leftPaneChildFiles)
         assertFalse("the popup opens on the current file unless asked otherwise", state.restoreLastView)
@@ -22,12 +23,14 @@ class NavigatorSettingsTest : TestCase() {
                 hideDotFiles = false,
                 compactFolders = false,
                 showPreview = true,
+                previewOnHover = true,
                 leftPaneChildren = false,
                 leftPaneChildFiles = false,
                 restoreLastView = true,
                 openCreatedFile = false,
             ),
         )
+        assertTrue(settings.previewOnHover)
         assertFalse(settings.openCreatedFile)
         assertFalse(settings.hideDotFiles)
         assertFalse(settings.compactFolders)

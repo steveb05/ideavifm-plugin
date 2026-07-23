@@ -104,6 +104,10 @@ editor: lexer keywords plus everything the analyzer adds (soft keywords like
 `private`, annotations, declarations and references). Files over 100 KB fall
 back to a truncated, lexer only preview.
 
+It follows the selection alone. A mouse crossing a pane on its way somewhere
+else would otherwise replace whatever you were reading, so pointing at a row
+previews it only once "preview what the mouse points at" is turned on.
+
 ## Marks and file operations
 
 File operations delegate to the IDE, so renaming a class runs the rename
@@ -124,7 +128,7 @@ Settings, Tools, IdeaVifm:
 - Hide dot files (default on).
 - Compact single child folder chains (default on).
 - Left pane shows the children of top level folders (default on).
-- Preview pane (default off).
+- Preview pane (default off), and whether it follows the mouse (default off).
 - Reopen on the last scope and zoom (default off; the scope, zoom and selection
   are remembered per project either way).
 

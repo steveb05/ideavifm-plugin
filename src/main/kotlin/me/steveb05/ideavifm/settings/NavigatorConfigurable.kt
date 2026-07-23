@@ -29,8 +29,20 @@ class NavigatorConfigurable : BoundConfigurable("IdeaVifm") {
                     .enabledIf(children.selected)
             }
         }
+        lateinit var preview: Cell<JBCheckBox>
         row {
-            checkBox("Show preview pane").bindSelected(settings::showPreview)
+            preview = checkBox("Show preview pane").bindSelected(settings::showPreview)
+        }
+        indent {
+            row {
+                checkBox("Preview what the mouse points at")
+                    .bindSelected(settings::previewOnHover)
+                    .enabledIf(preview.selected)
+                    .comment(
+                        "Off: only the selected row is previewed, so a mouse crossing a pane on its way " +
+                            "somewhere else leaves what you are reading alone.",
+                    )
+            }
         }
         row {
             checkBox("Open the file you create")

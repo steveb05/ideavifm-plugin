@@ -316,14 +316,21 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun previewHover(file: VirtualFile) {
-        if (!NavigatorSettings.getInstance().showPreview) return
+        if (!hoverPreviews()) return
         previewPanel.setTarget(file)
     }
 
     private fun previewHover(data: NavigatorNodeData) {
-        if (!NavigatorSettings.getInstance().showPreview) return
+        if (!hoverPreviews()) return
         previewPanel.setTarget(data.file, declarationOffset(data))
     }
+
+    /**
+     * The mouse crossing a pane on its way somewhere else would otherwise replace what is being read, so the
+     * preview follows the selection alone until the setting says the pointer may drive it too.
+     */
+    private fun hoverPreviews(): Boolean =
+        NavigatorSettings.getInstance().let { it.showPreview && it.previewOnHover }
 
     /** Where a file the query reached through a class it declares should open: on that class. */
     private fun declarationOffset(data: NavigatorNodeData?): Int? =
