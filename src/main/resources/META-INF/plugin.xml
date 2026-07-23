@@ -9,7 +9,7 @@
             editor where you filter the project tree as you type and move around with vim style keys.
         </p>
         <ul>
-            <li>Filter the whole scope as you type, matching folder names, file names, and the classes each file declares.</li>
+            <li>Filter the whole scope as you type, matching folder names, file names, and what each file declares, Kotlin extension functions included.</li>
             <li>A two pane layout with an optional ranger style preview that uses the editor's own syntax colors.</li>
             <li>Project, Module, Folder and custom scopes, with folder zoom.</li>
             <li>VCS status colors in both panes and a changed files only view.</li>
@@ -75,6 +75,11 @@
             <action id="IdeaVifm.ToggleChangedOnly" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Toggle Changed Files Only" description="Show only files with VCS changes in the navigator">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt C"/>
+            </action>
+            <action id="IdeaVifm.CycleDeclarations" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
+                    text="Navigator: Cycle Declaration Matching"
+                    description="Cycle what a query matches inside files: classes, top level declarations, all symbols">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt S"/>
             </action>
             <action id="IdeaVifm.NewElementInverted" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: New, Opening The Other Way"

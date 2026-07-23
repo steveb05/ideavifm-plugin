@@ -6,12 +6,11 @@ import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.speedSearch.SpeedSearchUtil
 import com.intellij.util.IconUtil
 import com.intellij.util.ui.JBUI
-import java.awt.Color
-import java.awt.Insets
-import javax.swing.JList
 import me.steveb05.ideavifm.scope.BaseEntry
 import me.steveb05.ideavifm.search.QueryHighlight
 import me.steveb05.ideavifm.vcs.VcsStatusColor
+import java.awt.Color
+import javax.swing.JList
 
 class NavigatorEntryCellRenderer(
     private val project: Project,

@@ -14,10 +14,23 @@ class DeclarationSearchTest : BasePlatformTestCase() {
 
     private lateinit var search: DeclarationSearch
     private lateinit var people: VirtualFile
+    private lateinit var strings: VirtualFile
 
     override fun setUp() {
         super.setUp()
         search = DeclarationSearch(project)
+        strings = myFixture.addFileToProject(
+            "model/Strings.kt",
+            """
+            package model
+
+            fun String.bobcase(): String = uppercase()
+
+            class Holder {
+                fun bobmember(): Int = 1
+            }
+            """.trimIndent(),
+        ).virtualFile
         people = myFixture.addFileToProject(
             "model/People.kt",
             """
@@ -33,10 +46,13 @@ class DeclarationSearchTest : BasePlatformTestCase() {
         myFixture.addFileToProject("notes/bob.txt", "not a class\n")
     }
 
-    private fun declaring(query: String, scope: com.intellij.psi.search.GlobalSearchScope = contentScope()) =
-        ReadAction.compute<Map<VirtualFile, List<Declaration>>, RuntimeException> {
-            search.search(query, scope)
-        }
+    private fun declaring(
+        query: String,
+        scope: com.intellij.psi.search.GlobalSearchScope = contentScope(),
+        depth: DeclarationDepth = DeclarationDepth.TOP_LEVEL,
+    ) = ReadAction.compute<Map<VirtualFile, List<Declaration>>, RuntimeException> {
+        search.search(query, scope, depth)
+    }
 
     private fun contentScope() = ProjectScope.getContentScope(project)
 
@@ -78,6 +94,53 @@ class DeclarationSearchTest : BasePlatformTestCase() {
         val notes = people.parent.parent.findChild("notes")!!
         val declaring = declaring("bob", GlobalSearchScopesCore.directoryScope(project, notes, true))
         assertTrue("a class outside the searched folder must not show up: $declaring", declaring.isEmpty())
+    }
+
+    fun testAnExtensionFunctionReachesTheFileThatDeclaresIt() {
+        assertEquals(
+            "an extension function is written at the top level of a file, not inside a class",
+            listOf("bobcase"),
+            declaring("bobcase")[strings]?.map { it.name },
+        )
+    }
+
+    fun testTheOffsetOfAnExtensionFunctionLandsOnIt() {
+        val offset = declaring("bobcase")[strings]?.first()?.offset
+        assertNotNull(offset)
+        assertTrue(
+            "the offset must land on the function, not at the top of the file",
+            String(strings.contentsToByteArray()).substring(offset!!).startsWith("bobcase"),
+        )
+    }
+
+    fun testClassesOnlyLeavesFunctionsAlone() {
+        assertTrue(
+            "the narrowest setting is what Go to Class offers, and a function is not a class",
+            declaring("bobcase", depth = DeclarationDepth.CLASSES).isEmpty(),
+        )
+    }
+
+    fun testTopLevelLeavesWhatAClassHoldsAlone() {
+        assertTrue(
+            "a member is reachable through the class that holds it, which is the row worth showing",
+            declaring("bobmember", depth = DeclarationDepth.TOP_LEVEL).isEmpty(),
+        )
+    }
+
+    fun testAllSymbolsReachesWhatAClassHolds() {
+        assertEquals(
+            listOf("bobmember"),
+            declaring("bobmember", depth = DeclarationDepth.SYMBOLS)[strings]?.map { it.name },
+        )
+    }
+
+    fun testAClassIsStillFoundAtEveryDepth() {
+        for (depth in DeclarationDepth.entries) {
+            assertTrue(
+                "widening what a query matches must not lose the classes: $depth",
+                declaring("bobby", depth = depth)[people]?.map { it.name }.orEmpty().contains("Bobby"),
+            )
+        }
     }
 
     fun testAPathQueryStaysAPathQuery() {

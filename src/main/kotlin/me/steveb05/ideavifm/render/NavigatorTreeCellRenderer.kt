@@ -65,7 +65,7 @@ class NavigatorTreeCellRenderer(
     }
 
     /**
-     * Why a file the query never names is on the list: the classes inside it that the query does name. They trail
+     * Why a file the query never names is on the list: what it declares that the query does name. They trail
      * the file name in gray, after the status color has been put back, so the suffix stays a footnote and
      * does not claim the row's VCS color.
      */

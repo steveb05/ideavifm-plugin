@@ -23,6 +23,7 @@ enum class NavigatorCommand(val actionId: String) {
     TOGGLE_PREVIEW("IdeaVifm.TogglePreview"),
     TOGGLE_DOT_FILES("IdeaVifm.ToggleDotFiles"),
     TOGGLE_CHANGED("IdeaVifm.ToggleChangedOnly"),
+    CYCLE_DECLARATIONS("IdeaVifm.CycleDeclarations"),
     TOGGLE_MARK("IdeaVifm.ToggleMark"),
     FOCUS_SEARCH("IdeaVifm.FocusSearch"),
     RESET_TREE("IdeaVifm.ResetTree"),

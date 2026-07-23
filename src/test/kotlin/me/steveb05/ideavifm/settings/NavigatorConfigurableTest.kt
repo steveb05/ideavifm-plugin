@@ -1,6 +1,7 @@
 package me.steveb05.ideavifm.settings
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import me.steveb05.ideavifm.search.DeclarationDepth
 
 /**
  * The panel binds its controls through the UI DSL, which resolves nothing until the panel is built: a control
@@ -22,6 +23,17 @@ class NavigatorConfigurableTest : BasePlatformTestCase() {
             settings.loadState(original)
         } finally {
             super.tearDown()
+        }
+    }
+
+    fun testEveryDepthRoundTripsThroughThePanel() {
+        val panel = NavigatorConfigurable().createPanel()
+        for (depth in DeclarationDepth.entries) {
+            settings.declarationDepth = depth
+            panel.reset()
+            assertFalse("the panel must open on the depth the settings hold: $depth", panel.isModified())
+            panel.apply()
+            assertEquals(depth, settings.declarationDepth)
         }
     }
 

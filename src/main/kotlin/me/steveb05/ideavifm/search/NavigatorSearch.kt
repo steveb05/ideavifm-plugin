@@ -2,7 +2,7 @@ package me.steveb05.ideavifm.search
 
 import com.intellij.openapi.vfs.VirtualFile
 
-/** A class, interface or object declared inside a file, and where it sits within the file. */
+/** Something a file declares, a class or a function among them, and where it sits within the file. */
 data class Declaration(val name: String, val offset: Int, val weight: Int)
 
 data class RankedFile(
@@ -15,8 +15,8 @@ data class SearchResult(val files: List<RankedFile>, val truncated: Boolean)
 
 /**
  * One ranked list out of the two ways a query can reach a file: its own name or path ([FileNameSearch]), and
- * the classes declared inside it ([DeclarationSearch]). A file the query names keeps its rank and carries the
- * declarations it also matched, so the row can say why. A file reached only through a class it declares ranks
+ * what is declared inside it ([DeclarationSearch]). A file the query names keeps its rank and carries the
+ * declarations it also matched, so the row can say why. A file reached only through what it declares ranks
  * below every named file and above the ones matched through their folders: "bob" should offer People.kt,
  * which declares Bob, before bob/config/build.gradle.kts, which merely lives in a folder spelled that way.
  */

@@ -10,8 +10,8 @@ Open it with `Ctrl+Alt+E` (remappable under Settings, Keymap, "IdeaVifm").
 ## What it does
 
 - **Filter as you type.** One query runs over the whole scope: folder names,
-  file names, and the classes each file declares. The letters it matches light
-  up in both panes.
+  file names, and what each file declares, Kotlin extension functions included.
+  The letters it matches light up in both panes.
 - **Two panes.** The left pane lists the top level entries of the active scope;
   the right pane shows the selected entry's subtree. Moving in one pane refills
   the other live.
@@ -45,6 +45,7 @@ default; both toggle off.
 | `Alt+P` | Toggle the preview pane |
 | `Ctrl+Period` | Toggle dot files |
 | `Alt+C` | Toggle changed files only |
+| `Alt+S` | Cycle what a query matches inside a file: classes, top level declarations, all symbols |
 | `Ctrl+F` | Return the caret to the search field |
 | `Alt+R` | Collapse the tree back to how it opens |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
@@ -80,13 +81,26 @@ whose path merely happens to hold a d, an o and a c. Spell a query with a slash
 (`api/usrv`) to match the path literally. A file whose own name matches ranks
 above one reached only through its folders.
 
-A query also matches the classes, interfaces and objects a file declares, read
-from the same index as Go to Class, so `bob` finds `People.kt` when it declares
-`Bob`. The matched classes trail the file name in gray (`People.kt  Bob`), and
-the preview and `Enter` open on the class rather than the top of the file. A
-file reached only through a class ranks below the ones the query names and above
-the ones matched through their folders. Single letter queries are left to file
-names, since one letter matches a class in almost every file.
+A query also matches what a file declares, read from the same index as Go to
+Class and Go to Symbol, so `bob` finds `People.kt` when it declares `Bob`. The
+matched declarations trail the file name in gray (`People.kt  Bob`), and the
+preview and `Enter` open on the declaration rather than the top of the file. A
+file reached only through a declaration ranks below the ones the query names and
+above the ones matched through their folders. Single letter queries are left to
+file names, since one letter matches a declaration in almost every file.
+
+How far inside a file a query reaches has three settings, and `Alt+S` cycles
+them for the popup you have open without touching the setting:
+
+- **Classes only**, which is what Go to Class offers.
+- **Classes and top level declarations** (the default), which adds what a file
+  declares at its own level: Kotlin extension functions, top level functions,
+  properties and type aliases.
+- **All symbols**, which adds every member of every class. Thorough, and noisy,
+  since a short query matches a great many members.
+
+The pane says which one is running whenever it is not the one the settings ask
+for.
 
 While a query is showing, the right pane's folder rows are there to say where a
 match lives rather than as results of their own, so `Ctrl+J` and `Ctrl+K` step
@@ -131,6 +145,8 @@ Settings, Tools, IdeaVifm:
 - Compact single child folder chains (default on).
 - Left pane shows the children of top level folders (default on).
 - Preview pane (default off), and whether it follows the mouse (default off).
+- What a query matches inside a file (default classes and top level
+  declarations).
 - Reopen on the last scope and zoom (default off; the scope, zoom and selection
   are remembered per project either way).
 

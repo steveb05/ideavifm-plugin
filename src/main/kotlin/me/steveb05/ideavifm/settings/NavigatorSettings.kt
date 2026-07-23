@@ -5,6 +5,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import me.steveb05.ideavifm.search.DeclarationDepth
 
 @Service
 @State(name = "IdeaVifmSettings", storages = [Storage("idea-vifm.xml")])
@@ -19,6 +20,7 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         var leftPaneChildFiles: Boolean = true,
         var restoreLastView: Boolean = false,
         var openCreatedFile: Boolean = true,
+        var declarationDepth: DeclarationDepth = DeclarationDepth.TOP_LEVEL,
     )
 
     private var current = State()
@@ -75,6 +77,12 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         get() = current.openCreatedFile
         set(value) {
             current.openCreatedFile = value
+        }
+
+    var declarationDepth: DeclarationDepth
+        get() = current.declarationDepth
+        set(value) {
+            current.declarationDepth = value
         }
 
     companion object {

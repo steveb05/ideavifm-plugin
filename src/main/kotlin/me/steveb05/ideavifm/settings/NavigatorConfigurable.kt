@@ -3,9 +3,11 @@ package me.steveb05.ideavifm.settings
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.Cell
+import com.intellij.ui.dsl.builder.bind
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.selected
+import me.steveb05.ideavifm.search.DeclarationDepth
 
 class NavigatorConfigurable : BoundConfigurable("IdeaVifm") {
 
@@ -43,6 +45,19 @@ class NavigatorConfigurable : BoundConfigurable("IdeaVifm") {
                             "somewhere else leaves what you are reading alone.",
                     )
             }
+        }
+        buttonsGroup("What a query matches inside a file, beside its name and path:") {
+            DeclarationDepth.entries.forEach { depth ->
+                row { radioButton(depth.label, depth) }
+            }
+        }.bind(settings::declarationDepth)
+        row {
+            comment(
+                "Top level declarations cover Kotlin extension functions and top level functions. All " +
+                    "symbols adds every member of every class, which is thorough and noisy: a short query " +
+                    "matches a great many of them. Alt+S cycles this inside the popup without changing " +
+                    "the setting.",
+            )
         }
         row {
             checkBox("Open the file you create")

@@ -1,6 +1,7 @@
 package me.steveb05.ideavifm.settings
 
 import junit.framework.TestCase
+import me.steveb05.ideavifm.search.DeclarationDepth
 
 class NavigatorSettingsTest : TestCase() {
 
@@ -10,6 +11,11 @@ class NavigatorSettingsTest : TestCase() {
         assertTrue(state.compactFolders)
         assertFalse(state.showPreview)
         assertFalse("the mouse crossing a pane must not replace what is being read", state.previewOnHover)
+        assertEquals(
+            "extension functions are found out of the box, class members are not",
+            DeclarationDepth.TOP_LEVEL,
+            state.declarationDepth,
+        )
         assertTrue(state.leftPaneChildren)
         assertTrue(state.leftPaneChildFiles)
         assertFalse("the popup opens on the current file unless asked otherwise", state.restoreLastView)
@@ -28,9 +34,11 @@ class NavigatorSettingsTest : TestCase() {
                 leftPaneChildFiles = false,
                 restoreLastView = true,
                 openCreatedFile = false,
+                declarationDepth = DeclarationDepth.SYMBOLS,
             ),
         )
         assertTrue(settings.previewOnHover)
+        assertEquals(DeclarationDepth.SYMBOLS, settings.declarationDepth)
         assertFalse(settings.openCreatedFile)
         assertFalse(settings.hideDotFiles)
         assertFalse(settings.compactFolders)

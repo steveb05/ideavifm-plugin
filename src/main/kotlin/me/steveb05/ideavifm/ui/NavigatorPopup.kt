@@ -4,11 +4,7 @@ import com.intellij.ide.CopyPasteDelegator
 import com.intellij.ide.IdeView
 import com.intellij.ide.PsiCopyPasteManager
 import com.intellij.ide.util.DeleteHandler
-import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.actionSystem.LangDataKeys
-import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
-import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
@@ -41,11 +37,6 @@ import com.intellij.util.Alarm
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
-import java.awt.Dimension
-import java.awt.Point
-import javax.swing.Box
-import javax.swing.JComponent
-import javax.swing.event.DocumentEvent
 import me.steveb05.ideavifm.action.NavigatorCommand
 import me.steveb05.ideavifm.action.NavigatorCommands
 import me.steveb05.ideavifm.file.NavigatorFileActions
@@ -54,18 +45,18 @@ import me.steveb05.ideavifm.preview.PreviewPanel
 import me.steveb05.ideavifm.scope.BaseEntry
 import me.steveb05.ideavifm.scope.NavigatorScope
 import me.steveb05.ideavifm.scope.ScopeResolver
-import me.steveb05.ideavifm.search.DeclarationSearch
-import me.steveb05.ideavifm.search.FileNameSearch
-import me.steveb05.ideavifm.search.NavigatorSearch
-import me.steveb05.ideavifm.search.QueryHighlight
-import me.steveb05.ideavifm.search.RankedFile
-import me.steveb05.ideavifm.search.SearchResult
+import me.steveb05.ideavifm.search.*
 import me.steveb05.ideavifm.settings.NavigatorSettings
 import me.steveb05.ideavifm.settings.NavigatorViewState
 import me.steveb05.ideavifm.tree.BrowseTree
 import me.steveb05.ideavifm.tree.NamedScopeFiles
 import me.steveb05.ideavifm.tree.NavigatorNodeData
 import me.steveb05.ideavifm.tree.SubtreeMatches
+import java.awt.Dimension
+import java.awt.Point
+import javax.swing.Box
+import javax.swing.JComponent
+import javax.swing.event.DocumentEvent
 
 class NavigatorPopup(private val context: NavigatorContext) {
 
@@ -127,6 +118,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var filterMatches: List<RankedFile>? = null
     private var namedMatches: List<RankedFile>? = null
     private var changedOnly = false
+
+    /** Cycled inside the popup and reset from the settings the next time it opens, the way [changedOnly] is. */
+    private var declarationDepth = NavigatorSettings.getInstance().declarationDepth
     private var footerNote: String? = null
     private val fileNameSearch = FileNameSearch(project)
     private val declarationSearch = DeclarationSearch(project)
@@ -228,6 +222,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
+        commands.bind(NavigatorCommand.CYCLE_DECLARATIONS) { cycleDeclarationDepth() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement(inverted = false) }
         commands.bind(NavigatorCommand.NEW_ELEMENT_INVERTED) { showNewElement(inverted = true) }
         commands.bind(NavigatorCommand.FOCUS_SEARCH) { focusSearch() }
@@ -332,7 +327,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun hoverPreviews(): Boolean =
         NavigatorSettings.getInstance().let { it.showPreview && it.previewOnHover }
 
-    /** Where a file the query reached through a class it declares should open: on that class. */
+    /** Where a file the query reached through something it declares should open: on that declaration. */
     private fun declarationOffset(data: NavigatorNodeData?): Int? =
         data?.takeUnless { it.isDirectory }?.declarations?.firstOrNull()?.offset
 
@@ -512,6 +507,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
+        val depth = declarationDepth
         ReadAction.nonBlocking<SearchResult> {
             val changed = if (changedOnly) changedFileSet() else null
             val shown = { file: VirtualFile ->
@@ -520,7 +516,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             val named = fileNameSearch.search(query, searchScope)
             NavigatorSearch.merge(
                 SearchResult(named.files.filter { shown(it.file) }, named.truncated),
-                declarationSearch.search(query, searchScope).filterKeys(shown),
+                declarationSearch.search(query, searchScope, depth).filterKeys(shown),
             )
         }
             .coalesceBy(this)
@@ -663,6 +659,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun toggleChangedOnly() {
         changedOnly = !changedOnly
+        refresh()
+    }
+
+    private fun cycleDeclarationDepth() {
+        declarationDepth = declarationDepth.next()
+        updateFooter()
         refresh()
     }
 
@@ -953,6 +955,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val notes = listOfNotNull(
             if (markCount > 0) "$markCount marked" else null,
             if (changedOnly) "Changed files only" else null,
+            declarationDepth.takeIf { it != NavigatorSettings.getInstance().declarationDepth }?.label,
             extra,
         )
         return notes.joinToString("; ").ifEmpty { null }
