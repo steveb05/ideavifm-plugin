@@ -8,93 +8,93 @@
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
         <applicationConfigurable parentId="tools"
-                                 instance="me.steveb05.ideavifm.NavigatorConfigurable"
+                                 instance="me.steveb05.ideavifm.settings.NavigatorConfigurable"
                                  id="me.steveb05.ideavifm.settings"
                                  displayName="IdeaVifm"/>
     </extensions>
     <actions>
         <action id="IdeaVifm.Show"
-                class="me.steveb05.ideavifm.IdeaVifmAction"
+                class="me.steveb05.ideavifm.action.IdeaVifmAction"
                 text="IdeaVifm"
                 description="Open the IdeaVifm popup">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt E"/>
             <add-to-group group-id="GoToMenu" anchor="last"/>
         </action>
         <group id="IdeaVifm.Commands" text="IdeaVifm" popup="false">
-            <action id="IdeaVifm.LeftUp" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.LeftUp" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Left Pane Up" description="Move the left pane selection up in the navigator popup">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt K"/>
             </action>
-            <action id="IdeaVifm.LeftDown" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.LeftDown" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Left Pane Down" description="Move the left pane selection down in the navigator popup">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt J"/>
             </action>
-            <action id="IdeaVifm.RightUp" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.RightUp" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Right Pane Up" description="Move the right pane selection up in the navigator popup">
                 <keyboard-shortcut keymap="$default" first-keystroke="control K"/>
             </action>
-            <action id="IdeaVifm.RightDown" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.RightDown" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Right Pane Down" description="Move the right pane selection down in the navigator popup">
                 <keyboard-shortcut keymap="$default" first-keystroke="control J"/>
             </action>
-            <action id="IdeaVifm.PaneLeft" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PaneLeft" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Collapse or Exit Left" description="Collapse, walk to the parent, or cross into the left pane">
                 <keyboard-shortcut keymap="$default" first-keystroke="control H"/>
             </action>
-            <action id="IdeaVifm.PaneRight" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PaneRight" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Expand or Enter Right" description="Expand the folder or enter the right pane">
                 <keyboard-shortcut keymap="$default" first-keystroke="control L"/>
             </action>
-            <action id="IdeaVifm.ZoomIn" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ZoomIn" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Zoom In" description="Make the selected folder the base of both panes">
                 <keyboard-shortcut keymap="$default" first-keystroke="control ENTER"/>
             </action>
-            <action id="IdeaVifm.ZoomOut" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ZoomOut" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Zoom Out" description="Pop the navigator zoom stack">
                 <keyboard-shortcut keymap="$default" first-keystroke="BACK_SPACE"/>
             </action>
-            <action id="IdeaVifm.TogglePreview" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.TogglePreview" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Toggle Preview" description="Show or hide the navigator preview pane">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt P"/>
             </action>
-            <action id="IdeaVifm.ToggleDotFiles" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ToggleDotFiles" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Toggle Dot Files" description="Show or hide dot files in the navigator">
                 <keyboard-shortcut keymap="$default" first-keystroke="control PERIOD"/>
             </action>
-            <action id="IdeaVifm.ToggleChangedOnly" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ToggleChangedOnly" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Toggle Changed Files Only" description="Show only files with VCS changes in the navigator">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt C"/>
             </action>
-            <action id="IdeaVifm.NewElementInverted" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.NewElementInverted" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: New, Opening The Other Way"
                     description="Open the IDE New menu, inverting the setting that opens what you create">
                 <keyboard-shortcut keymap="$default" first-keystroke="shift alt INSERT"/>
             </action>
-            <action id="IdeaVifm.ResetTree" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ResetTree" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Collapse Tree" description="Collapse the navigator tree back to how it opens">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt R"/>
             </action>
-            <action id="IdeaVifm.FocusSearch" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.FocusSearch" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Focus Search Field" description="Put the caret back in the navigator search field">
                 <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
             </action>
-            <action id="IdeaVifm.ToggleMark" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.ToggleMark" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Toggle Mark" description="Mark or unmark the selected navigator row for a bulk operation">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt M"/>
             </action>
-            <action id="IdeaVifm.PreviewLineDown" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PreviewLineDown" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Preview Line Down" description="Scroll the navigator preview down one line">
                 <keyboard-shortcut keymap="$default" first-keystroke="control E"/>
             </action>
-            <action id="IdeaVifm.PreviewLineUp" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PreviewLineUp" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Preview Line Up" description="Scroll the navigator preview up one line">
                 <keyboard-shortcut keymap="$default" first-keystroke="control Y"/>
             </action>
-            <action id="IdeaVifm.PreviewHalfDown" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PreviewHalfDown" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Preview Half Page Down" description="Scroll the navigator preview down half a page">
                 <keyboard-shortcut keymap="$default" first-keystroke="control D"/>
             </action>
-            <action id="IdeaVifm.PreviewHalfUp" class="me.steveb05.ideavifm.NavigatorCommandStubAction"
+            <action id="IdeaVifm.PreviewHalfUp" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Preview Half Page Up" description="Scroll the navigator preview up half a page">
                 <keyboard-shortcut keymap="$default" first-keystroke="control U"/>
             </action>
