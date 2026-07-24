@@ -48,6 +48,8 @@ default; both toggle off.
 | `Alt+S` | Cycle what a query matches inside a file: classes, top level declarations, all symbols |
 | `Ctrl+F` | Return the caret to the search field |
 | `Alt+R` | Collapse the tree back to how it opens |
+| `Alt+L` / `Alt+H` | Open one more level of folders; close one level |
+| `Ctrl+Shift+J` / `Ctrl+Shift+K` | Walk to the next or previous top level folder, opening it and closing the one left behind |
 | `Ctrl+E` / `Ctrl+Y` | Scroll the preview one line |
 | `Ctrl+D` / `Ctrl+U` | Scroll the preview half a page |
 | `Alt+Insert` | The IDE New menu for the selected folder |
@@ -70,6 +72,38 @@ The popup opens on the file you are editing, walked open down to it. Clearing
 the query, switching scope and zooming return to that same view; without the
 current file in sight it falls back to wherever the view was left, then to the
 selected row.
+
+How far the tree opens is a setting, and "down to the packages" is the default:
+folders that hold nothing but more folders keep opening, so a package chain such
+as `src/main/kotlin/me/acme` is crossed in one go and the packages under it come
+into view, closed. Files of their own are what make a folder content rather than
+structure, and content is left closed wherever it sits: a package holding
+classes is not opened for having a subpackage among them, and neither is a
+folder holding a couple of files, top of the tree or not. The chain that carries
+the walk from the folders into the packages is the exception, since leading you
+to its end is the whole reason it is drawn as one row, so a class sitting beside
+the packages shows up there instead of closing the level. Deeper down a chain
+runs from one package to the next, where it holds its classes back the way its
+plain neighbours do. A folder holding nothing but files opens when it is the
+only one there, and that is a setting.
+
+A module is content of its own: the tree lists it and stops there, so a root
+full of modules reads as a list of them however far the tree is set to open. How
+far a module opens is read from inside it, which is where selecting it in the
+left pane or zooming into it puts you, and that is its own setting (down to the
+packages by default). The IDE says what a module is, taking the build tool's
+word for where a project sits, so no file names are guessed at; without modules
+to recognise the setting never fires.
+
+`Alt+L` opens a level at a time and `Alt+H` closes one, counting the levels the
+way the tree draws them: a chain of folders shown as one row is one step, not
+five. `Ctrl+Shift+J` and `Ctrl+Shift+K` walk between the top level folders,
+opening the one they land on as far as their own setting says and closing the
+one left behind. What a query finds is shown wherever it sits, whatever these
+settings say, so naming a module or a folder still opens it.
+
+Creating, renaming and deleting show up in both panes as they happen, without
+reopening folders you closed.
 
 ## Search
 
@@ -143,6 +177,19 @@ Settings, Tools, IdeaVifm:
 
 - Hide dot files (default on).
 - Compact single child folder chains (default on).
+- Open a folder holding nothing but files when it is the only one there
+  (default on): the tree stops on the packages, but a lone source folder still
+  shows what is in it.
+- How far the tree opens (default down to the packages), which is also what
+  `Alt+R` puts it back to.
+- How far a module opens once you are inside it (default down to the packages),
+  which is where selecting it in the left pane or zooming into it puts you. The
+  tree itself lists a module and stops there, whatever it is set to open, while a
+  folder holding modules stays scaffolding, so its own build file does not end
+  the walk there.
+- How far a folder opens when `Ctrl+Shift+J` or `Ctrl+Shift+K` lands on it
+  (default down to the packages), and whether jumping closes the folder you left
+  (default on).
 - Left pane shows the children of top level folders (default on).
 - Preview pane (default off), and whether it follows the mouse (default off).
 - What a query matches inside a file (default classes and top level

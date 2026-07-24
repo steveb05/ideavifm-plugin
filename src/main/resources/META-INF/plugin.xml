@@ -87,8 +87,29 @@
                 <keyboard-shortcut keymap="$default" first-keystroke="shift alt INSERT"/>
             </action>
             <action id="IdeaVifm.ResetTree" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
-                    text="Navigator: Collapse Tree" description="Collapse the navigator tree back to how it opens">
+                    text="Navigator: Collapse Tree"
+                    description="Collapse the navigator tree back to how it opens, with the packages in view and what they hold closed">
                 <keyboard-shortcut keymap="$default" first-keystroke="alt R"/>
+            </action>
+            <action id="IdeaVifm.ExpandLevel" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
+                    text="Navigator: Open One More Level"
+                    description="Open every folder one level past the deepest level the navigator tree is open to">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt L"/>
+            </action>
+            <action id="IdeaVifm.CollapseLevel" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
+                    text="Navigator: Close One Level"
+                    description="Close the navigator tree back to one level shallower">
+                <keyboard-shortcut keymap="$default" first-keystroke="alt H"/>
+            </action>
+            <action id="IdeaVifm.NextRootFolder" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
+                    text="Navigator: Next Top Level Folder"
+                    description="Walk to the next top level folder, opening it and closing the one left behind">
+                <keyboard-shortcut keymap="$default" first-keystroke="control shift J"/>
+            </action>
+            <action id="IdeaVifm.PreviousRootFolder" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
+                    text="Navigator: Previous Top Level Folder"
+                    description="Walk to the previous top level folder, opening it and closing the one left behind">
+                <keyboard-shortcut keymap="$default" first-keystroke="control shift K"/>
             </action>
             <action id="IdeaVifm.FocusSearch" class="me.steveb05.ideavifm.action.NavigatorCommandStubAction"
                     text="Navigator: Focus Search Field" description="Put the caret back in the navigator search field">

@@ -21,6 +21,10 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
@@ -150,6 +154,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             override fun textChanged(e: DocumentEvent) = scheduleRefresh()
         })
         registerKeys()
+        watchFileSystem(created)
         Disposer.register(created) { saveView() }
         setActivePane(Pane.RIGHT)
         if (NavigatorSettings.getInstance().restoreLastView) restoreView()
@@ -229,6 +234,16 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.RESET_TREE, isEnabled = { searchField.text.isEmpty() }) {
             treePanel.resetToOpenState()
         }
+        commands.bind(NavigatorCommand.EXPAND_LEVEL, isEnabled = { browsing() }) {
+            setActivePane(Pane.RIGHT)
+            treePanel.expandOneLevel()
+        }
+        commands.bind(NavigatorCommand.COLLAPSE_LEVEL, isEnabled = { browsing() }) {
+            setActivePane(Pane.RIGHT)
+            treePanel.collapseOneLevel()
+        }
+        commands.bind(NavigatorCommand.NEXT_ROOT_FOLDER, isEnabled = { browsing() }) { jumpRootFolder(1) }
+        commands.bind(NavigatorCommand.PREVIOUS_ROOT_FOLDER, isEnabled = { browsing() }) { jumpRootFolder(-1) }
         commands.bind(NavigatorCommand.TOGGLE_MARK, isEnabled = { activePane == Pane.RIGHT }) {
             toggleMark()
         }
@@ -266,8 +281,30 @@ class NavigatorPopup(private val context: NavigatorContext) {
         commands.bind(NavigatorCommand.PREVIEW_HALF_UP, isEnabled = { previewVisible() }) { previewPanel.scrollHalfPage(-1) }
     }
 
+    /**
+     * Both panes read the file system once and then sit still, so whatever changes it while they are up has
+     * to bring them back in step: a delete run from the context menu, a refactoring that only finishes once
+     * the action that started it has returned, or the IDE moving files around on its own.
+     */
+    private fun watchFileSystem(parent: JBPopup) {
+        val inProject = project.basePath?.let { "$it/" } ?: return
+        project.messageBus.connect(parent).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    if (events.any { it !is VFileContentChangeEvent && it.path.startsWith(inProject) }) {
+                        scheduleRefresh()
+                    }
+                }
+            },
+        )
+    }
+
+    /** A file system change can land while the popup is on its way out, and its alarm is gone by then. */
     private fun scheduleRefresh() {
+        val activePopup = popup ?: return
         val activeAlarm = alarm ?: return
+        if (activePopup.isDisposed || project.isDisposed) return
         activeAlarm.cancelAllRequests()
         activeAlarm.addRequest({ refresh() }, 50)
     }
@@ -356,6 +393,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun refresh() {
+        dropDeletedZooms()
         val query = searchField.text.trim()
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
@@ -379,6 +417,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         namedMatches = null
         runFilterSearch(query, resolved)
+    }
+
+    /** A zoom into a folder that has since been deleted pops back out rather than showing what is gone. */
+    private fun dropDeletedZooms() {
+        while (zoomStack.isNotEmpty() && !zoomStack.last().dir.isValid) {
+            zoomStack.removeLast()
+            reopen = true
+        }
     }
 
     private fun showBrowse(resolved: ScopeResolver.Resolved) {
@@ -460,25 +506,25 @@ class NavigatorPopup(private val context: NavigatorContext) {
         when {
             filter != null -> {
                 treePanel.showPruned(bucketFor(filter, entry), entry?.file, matchesOnly = searchActive())
-                treePanel.expandAll()
                 treePanel.setEmptyText("Nothing found")
                 treePanel.selectBestMatch()
             }
 
             named != null -> {
-                treePanel.showPruned(bucketFor(named, entry), entry?.file)
-                treePanel.expandTopLevel()
+                treePanel.showPruned(bucketFor(named, entry), entry?.file, openFully = false)
                 treePanel.setEmptyText("No files in scope")
                 context.currentFile?.let { treePanel.selectFile(it) }
             }
 
             else -> {
                 val dir = entry?.file?.takeIf { entry.isDirectory && it.isValid }
-                if (dir == null) {
-                    treePanel.showEmpty()
-                } else {
-                    treePanel.showSubtree(dir)
-                    if (autoExpand) treePanel.expandToFirstFileLevel()
+                when {
+                    dir == null -> treePanel.showEmpty()
+                    treePanel.isBrowsing(dir) -> treePanel.reloadSubtree(dir)
+                    else -> {
+                        treePanel.showSubtree(dir)
+                        if (autoExpand) treePanel.openTo(NavigatorSettings.getInstance().treeOpenLevel)
+                    }
                 }
             }
         }
@@ -487,6 +533,14 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     /** A query is running; the changed files view and the named scopes fill the panes with an empty one. */
     private fun searchActive(): Boolean = searchField.text.trim().isNotEmpty()
+
+    /** The level and jump keys shape a tree that is being browsed, not the rows a query or a scope filled. */
+    private fun browsing(): Boolean = searchField.text.isEmpty() && filterMatches == null && namedMatches == null
+
+    private fun jumpRootFolder(delta: Int) {
+        setActivePane(Pane.RIGHT)
+        treePanel.jumpToRootFolder(delta)
+    }
 
     private fun bucketFor(
         matches: List<RankedFile>,

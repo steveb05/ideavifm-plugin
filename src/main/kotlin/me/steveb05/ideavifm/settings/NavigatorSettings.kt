@@ -6,6 +6,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import me.steveb05.ideavifm.search.DeclarationDepth
+import me.steveb05.ideavifm.tree.TreeLevel
 
 @Service
 @State(name = "IdeaVifmSettings", storages = [Storage("idea-vifm.xml")])
@@ -14,6 +15,11 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
     data class State(
         var hideDotFiles: Boolean = true,
         var compactFolders: Boolean = true,
+        var openLoneFolder: Boolean = true,
+        var treeOpenLevel: TreeLevel = TreeLevel.PACKAGES,
+        var jumpOpenLevel: TreeLevel = TreeLevel.PACKAGES,
+        var moduleOpenLevel: TreeLevel = TreeLevel.PACKAGES,
+        var closeFolderOnJump: Boolean = true,
         var showPreview: Boolean = false,
         var previewOnHover: Boolean = false,
         var leftPaneChildren: Boolean = true,
@@ -41,6 +47,36 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         get() = current.compactFolders
         set(value) {
             current.compactFolders = value
+        }
+
+    var openLoneFolder: Boolean
+        get() = current.openLoneFolder
+        set(value) {
+            current.openLoneFolder = value
+        }
+
+    var treeOpenLevel: TreeLevel
+        get() = current.treeOpenLevel
+        set(value) {
+            current.treeOpenLevel = value
+        }
+
+    var jumpOpenLevel: TreeLevel
+        get() = current.jumpOpenLevel
+        set(value) {
+            current.jumpOpenLevel = value
+        }
+
+    var moduleOpenLevel: TreeLevel
+        get() = current.moduleOpenLevel
+        set(value) {
+            current.moduleOpenLevel = value
+        }
+
+    var closeFolderOnJump: Boolean
+        get() = current.closeFolderOnJump
+        set(value) {
+            current.closeFolderOnJump = value
         }
 
     var showPreview: Boolean

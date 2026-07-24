@@ -30,6 +30,7 @@ import me.steveb05.ideavifm.tree.NavigatorNodeData
 import me.steveb05.ideavifm.tree.PrunedMatch
 import me.steveb05.ideavifm.tree.PrunedTreeBuilder
 import me.steveb05.ideavifm.tree.PrunedTreeNode
+import me.steveb05.ideavifm.tree.TreeLevel
 
 object PaneBorders {
     val focus: javax.swing.border.Border
@@ -54,10 +55,17 @@ class TreePanel(
     enum class CollapseOutcome { COLLAPSED, MOVED_TO_PARENT, AT_TOP_LEVEL }
 
     private val tree = Tree()
+    private val levels = TreeLevels(project, tree)
     private val marked = LinkedHashSet<VirtualFile>()
 
     /** Set while the pane shows what a query found, where the folder rows are scaffolding rather than results. */
     private var matchesOnly = false
+
+    /** The folder the pane is browsing, or null while it shows what a query or a scope turned up. */
+    private var browseBase: VirtualFile? = null
+
+    /** Set while a pruned view shows every folder holding a match rather than its top level only. */
+    private var prunedOpensFully = true
 
     val component: JComponent = JBScrollPane(tree)
 
@@ -132,23 +140,52 @@ class TreePanel(
     fun showSubtree(base: VirtualFile) {
         marked.clear()
         matchesOnly = false
+        browseBase = base
         tree.model = BrowseTree.createSubtreeModel(project, base)
         if (tree.rowCount > 0) tree.setSelectionRow(0)
+    }
+
+    /** Whether the pane is already browsing [dir], as opposed to another folder or a query's matches. */
+    fun isBrowsing(dir: VirtualFile): Boolean = browseBase == dir
+
+    /**
+     * Reads [dir] again while keeping the folders that are open and the row the cursor is on. Creating,
+     * deleting or renaming a file has to show up in the pane without throwing away the shape the user gave it.
+     */
+    fun reloadSubtree(dir: VirtualFile) {
+        val expanded = expandedFiles()
+        val selected = selectedFile()
+        matchesOnly = false
+        browseBase = dir
+        tree.model = BrowseTree.createSubtreeModel(project, dir)
+        expandFiles(expanded)
+        selected?.takeIf { it.isValid }?.let { selectFile(it) }
+        if (tree.selectionPath == null && tree.rowCount > 0) tree.setSelectionRow(0)
     }
 
     fun showEmpty() {
         marked.clear()
         matchesOnly = false
+        browseBase = null
         tree.model = DefaultTreeModel(DefaultMutableTreeNode(NavigatorNodeData(null, "", true)))
     }
 
     /**
      * [matchesOnly] says the rows come from a query rather than from browsing, which is what makes the folder
      * rows scaffolding: they are on screen to say where the matches live, not as results of their own.
+     * [openFully] opens every folder holding a match, which is how a query's results are read: what the query
+     * found is the point, not how deep it sits. A scope filling the pane instead opens its top level only.
      */
-    fun showPruned(ranked: List<RankedFile>, base: VirtualFile?, matchesOnly: Boolean = false) {
+    fun showPruned(
+        ranked: List<RankedFile>,
+        base: VirtualFile?,
+        matchesOnly: Boolean = false,
+        openFully: Boolean = true,
+    ) {
         marked.clear()
         this.matchesOnly = matchesOnly
+        this.prunedOpensFully = openFully
+        browseBase = null
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base?.name.orEmpty(), true))
         if (base != null) {
             val prunedMatches = ranked.mapNotNull { m ->
@@ -163,22 +200,30 @@ class TreePanel(
             appendPruned(hiddenRoot, display)
         }
         tree.model = DefaultTreeModel(hiddenRoot)
+        if (openFully) expandAll() else expandTopLevel()
     }
 
-    fun expandToFirstFileLevel() {
-        for (node in BrowseTree.autoExpandTargets(project, model())) {
-            tree.expandPath(TreePath(node.path))
-        }
-    }
+    fun expandAll() = levels.expandAll()
 
-    fun expandAll() = TreeUtil.expandAll(tree)
+    fun expandTopLevel() = levels.expandTopLevel()
 
-    fun expandTopLevel() = TreeUtil.expand(tree, 1)
+    /** Opens the pane to [level], or to what its root asks for when the root is a module of its own. */
+    fun openTo(level: TreeLevel) = levels.openRoot(level)
 
-    /** Collapses the tree and opens it again the way it looks when the popup opens. */
+    fun expandOneLevel() = levels.expandOneLevel()
+
+    fun collapseOneLevel() = levels.collapseOneLevel()
+
+    fun jumpToRootFolder(delta: Int): Boolean = levels.jumpToRootFolder(delta)
+
+    /** Collapses the tree and opens it again the way the view it is showing opens. */
     fun resetToOpenState() {
         TreeUtil.collapseAll(tree, 0)
-        expandToFirstFileLevel()
+        when {
+            browseBase != null -> levels.openRoot(NavigatorSettings.getInstance().treeOpenLevel)
+            prunedOpensFully -> levels.expandAll()
+            else -> levels.expandTopLevel()
+        }
         selectFirstOpenedFolder()
     }
 
@@ -241,7 +286,7 @@ class TreePanel(
     }
 
     fun selectBestMatch() {
-        val hiddenRoot = model().root as DefaultMutableTreeNode
+        val hiddenRoot = rootNode()
         var best: DefaultMutableTreeNode? = null
         var bestWeight = Int.MIN_VALUE
         val enumeration = hiddenRoot.depthFirstEnumeration()
@@ -258,7 +303,7 @@ class TreePanel(
     }
 
     fun selectFile(file: VirtualFile) {
-        val hiddenRoot = model().root as DefaultMutableTreeNode
+        val hiddenRoot = rootNode()
         val enumeration = hiddenRoot.depthFirstEnumeration()
         while (enumeration.hasMoreElements()) {
             val node = enumeration.nextElement() as DefaultMutableTreeNode
@@ -329,6 +374,36 @@ class TreePanel(
         model().removeNodeFromParent(node)
     }
 
+    private fun expandedFiles(): Set<VirtualFile> {
+        val files = LinkedHashSet<VirtualFile>()
+        for (row in 0 until tree.rowCount) {
+            val path = tree.getPathForRow(row) ?: continue
+            if (!tree.isExpanded(path)) continue
+            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: continue
+            nodeData(node)?.file?.let { files.add(it) }
+        }
+        return files
+    }
+
+    /** Walks the rows as they come into view, since opening one row is what brings the next within reach. */
+    private fun expandFiles(remembered: Set<VirtualFile>) {
+        if (remembered.isEmpty()) return
+        var row = 0
+        while (row < tree.rowCount) {
+            reopenRow(row, remembered)
+            row++
+        }
+    }
+
+    private fun reopenRow(row: Int, remembered: Set<VirtualFile>) {
+        val path = tree.getPathForRow(row) ?: return
+        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
+        val file = nodeData(node)?.file ?: return
+        if (file !in remembered) return
+        BrowseTree.loadChildren(project, model(), node)
+        tree.expandPath(path)
+    }
+
     private fun appendPruned(parent: DefaultMutableTreeNode, nodes: List<PrunedTreeNode<RankedFile>>) {
         val parentFile = (parent.userObject as NavigatorNodeData).file
         for (n in nodes) {
@@ -361,6 +436,8 @@ class TreePanel(
     }
 
     private fun model(): DefaultTreeModel = tree.model as DefaultTreeModel
+
+    private fun rootNode(): DefaultMutableTreeNode = model().root as DefaultMutableTreeNode
 
     private fun selectedNode(): DefaultMutableTreeNode? =
         tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode

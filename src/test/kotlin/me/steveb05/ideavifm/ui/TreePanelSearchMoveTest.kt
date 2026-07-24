@@ -1,7 +1,13 @@
 package me.steveb05.ideavifm.ui
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.ui.components.JBScrollPane
+import javax.swing.JTree
+import javax.swing.tree.DefaultMutableTreeNode
 import me.steveb05.ideavifm.search.RankedFile
+import me.steveb05.ideavifm.settings.NavigatorSettings
+import me.steveb05.ideavifm.tree.NavigatorNodeData
+import me.steveb05.ideavifm.tree.TreeLevel
 
 /**
  * A search fills the pane with the files it found under the folders that hold them. Those folders are there
@@ -19,8 +25,33 @@ class TreePanelSearchMoveTest : BasePlatformTestCase() {
             myFixture.findFileInTempDir("root"),
             matchesOnly,
         )
-        panel.expandAll()
         return panel
+    }
+
+    /**
+     * The levels shape a tree that is being browsed. What a query found is shown wherever it sits, so naming a
+     * module or a folder still opens it whatever the opening level is set to.
+     */
+    fun testAQuerysMatchesOpenWhateverTheLevelSettingSays() {
+        val settings = NavigatorSettings.getInstance()
+        val before = settings.treeOpenLevel
+        settings.treeOpenLevel = TreeLevel.NONE
+        try {
+            val panel = panelOverMatches(matchesOnly = true)
+            assertEquals(listOf("one", "Region.kt", "two/deep", "Regional.kt"), rows(panel))
+            panel.resetToOpenState()
+            assertEquals("a reset leaves them open too", listOf("one", "Region.kt", "two/deep", "Regional.kt"), rows(panel))
+        } finally {
+            settings.treeOpenLevel = before
+        }
+    }
+
+    private fun rows(panel: TreePanel): List<String> {
+        val tree = (panel.component as JBScrollPane).viewport.view as JTree
+        return (0 until tree.rowCount).map { row ->
+            val node = tree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
+            (node.userObject as NavigatorNodeData).name
+        }
     }
 
     fun testTheFoldersHoldingTheMatchesAreSteppedOver() {
