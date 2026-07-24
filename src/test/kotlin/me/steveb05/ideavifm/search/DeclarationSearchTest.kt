@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.psi.search.ProjectScope
+import com.intellij.testFramework.DumbModeTestUtils
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 /**
@@ -55,6 +56,14 @@ class DeclarationSearchTest : BasePlatformTestCase() {
     }
 
     private fun contentScope() = ProjectScope.getContentScope(project)
+
+    /** Indexing can start after the popup has checked for it and before this search runs on its own thread. */
+    fun testIndexingLeavesNothingToReadRatherThanThrowing() {
+        DumbModeTestUtils.runInDumbModeSynchronously(project) {
+            assertTrue(declaring("bob").isEmpty())
+        }
+        assertEquals(listOf("Bob", "Bobby"), declaring("bob")[people]?.map { it.name })
+    }
 
     fun testAClassNameReachesTheFileThatDeclaresIt() {
         assertEquals(listOf("Bob", "Bobby"), declaring("bob")[people]?.map { it.name })

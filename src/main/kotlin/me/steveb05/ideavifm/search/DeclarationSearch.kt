@@ -5,6 +5,7 @@ import com.intellij.navigation.ChooseByNameContributorEx
 import com.intellij.navigation.NavigationItem
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
@@ -40,12 +41,18 @@ enum class DeclarationDepth(val label: String) {
  */
 class DeclarationSearch(private val project: Project) {
 
+    /**
+     * The names come from the index, so there are none to read while the project is indexing. The popup checks
+     * for that before it starts a search, but indexing can begin between that check and this call, which runs
+     * on a background thread: without this the contributors would throw rather than say they have nothing.
+     */
     fun search(
         rawQuery: String,
         scope: GlobalSearchScope,
         depth: DeclarationDepth = DeclarationDepth.TOP_LEVEL,
     ): Map<VirtualFile, List<Declaration>> {
         ApplicationManager.getApplication().assertReadAccessAllowed()
+        if (DumbService.getInstance(project).isDumb) return emptyMap()
         val query = rawQuery.trim().trim('/')
         if (query.length < MIN_QUERY || query.contains('/')) return emptyMap()
 
