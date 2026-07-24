@@ -34,10 +34,15 @@ class FileNameSearchTest : BasePlatformTestCase() {
         assertFalse(names.contains("config.xml"))
     }
 
-    fun testCamelHumpMatch() {
-        val names = names("USK")
-        assertTrue(names.contains("UserService.kt"))
-        assertFalse(names.contains("userService.ts"))
+    fun testAnUppercaseQueryFindsWhatALowercaseOneFinds() {
+        assertEquals(names("usrv").toSet(), names("USRV").toSet())
+        assertTrue(names("USRV").contains("userService.ts"))
+    }
+
+    /** Typing a capital says which of two files spelled the same way is meant, not which of them matches. */
+    fun testCaseDecidesTheRankRatherThanTheMatch() {
+        assertEquals(listOf("userService.ts", "UserService.kt"), names("user"))
+        assertEquals(listOf("UserService.kt", "userService.ts"), names("User"))
     }
 
     fun testPathQueryMatchesPathSegments() {
