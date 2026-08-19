@@ -143,6 +143,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .setResizable(true)
             .setMovable(true)
             .setCancelOnClickOutside(true)
+            // The New and Rename dialogs deactivate this window, and the popup is there again once they close.
             .setCancelOnWindowDeactivation(false)
             .setDimensionServiceKey(project, "me.steveb05.ideavifm.Popup", true)
             .createPopup()
@@ -155,6 +156,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         })
         registerKeys()
         watchFileSystem(created)
+        closeWhenIdeLosesFocus(created)
         Disposer.register(created) { saveView() }
         setActivePane(Pane.RIGHT)
         if (NavigatorSettings.getInstance().restoreLastView) restoreView()
@@ -299,6 +301,13 @@ class NavigatorPopup(private val context: NavigatorContext) {
             },
         )
     }
+
+    /**
+     * Switching workspace or window leaves the popup floating over whatever the user moved to, since the
+     * platform never cancels a popup over a window it cannot see the clicks of. Leaving the IDE is reported
+     * only once the focus lands outside it, so the dialogs opened from here still hold the popup open.
+     */
+    private fun closeWhenIdeLosesFocus(parent: JBPopup) = runWhenIdeLosesFocus(parent) { parent.cancel() }
 
     /** A file system change can land while the popup is on its way out, and its alarm is gone by then. */
     private fun scheduleRefresh() {
@@ -833,11 +842,15 @@ class NavigatorPopup(private val context: NavigatorContext) {
      * and get out of the way, or keep the navigator up with the file selected and the caret in the search field.
      */
     private fun selectCreated(file: VirtualFile) {
+        val activePopup = popup ?: return
         if (openCreated && !file.isDirectory) {
-            popup?.closeOk(null)
+            if (!activePopup.isDisposed) activePopup.closeOk(null)
             FileEditorManager.getInstance(project).openFile(file, true)
             return
         }
+
+        // Leaving the IDE closes the popup, and the New dialog it opened outlives it to create the file.
+        if (activePopup.isDisposed) return
         if (!file.isDirectory) closeEditorFor(file)
         if (searchField.text.isNotEmpty()) searchField.text = ""
         refresh()
