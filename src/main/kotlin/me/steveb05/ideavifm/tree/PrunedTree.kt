@@ -59,9 +59,27 @@ object SubtreeMatches {
     fun <T> matchesUnder(items: List<T>, entry: BaseEntry, fileOf: (T) -> VirtualFile): List<T> =
         items.filter { VfsUtilCore.isAncestor(entry.file, fileOf(it), false) }
 
+    /**
+     * How many matches sit under each entry. Asking that of every entry in turn walks the whole result list
+     * once per entry, which a thousand matches and a wide project turn into real time on the UI thread, so
+     * each match walks up to its roots instead and counts itself in every entry it passes.
+     */
     fun <T> countsFor(
         items: List<T>,
         entries: List<BaseEntry>,
         fileOf: (T) -> VirtualFile,
-    ): Map<BaseEntry, Int> = entries.associateWith { matchesUnder(items, it, fileOf).size }
+    ): Map<BaseEntry, Int> {
+        val byFile = HashMap<VirtualFile, MutableList<BaseEntry>>()
+        for (entry in entries) byFile.getOrPut(entry.file) { ArrayList() }.add(entry)
+        val counts = HashMap<BaseEntry, Int>()
+        for (entry in entries) counts[entry] = 0
+        for (item in items) {
+            var current: VirtualFile? = fileOf(item)
+            while (current != null) {
+                byFile[current]?.forEach { counts[it] = counts.getValue(it) + 1 }
+                current = current.parent
+            }
+        }
+        return counts
+    }
 }
