@@ -14,6 +14,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
@@ -65,6 +66,9 @@ import javax.swing.event.DocumentEvent
 class NavigatorPopup(private val context: NavigatorContext) {
 
     private enum class Pane { LEFT, RIGHT, PREVIEW }
+
+    /** Who asked for a refresh. What changed on disk must not reshape a tree the user is reading. */
+    private enum class Refresh { USER, FILE_SYSTEM }
 
     private class ZoomFrame(
         val dir: VirtualFile,
@@ -136,6 +140,17 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     /** Its own alarm: the search one is cancelled wholesale whenever the query changes. */
     private var focusAlarm: Alarm? = null
+
+    private var pendingRefresh: Refresh? = null
+
+    /** The browsing view a query replaced: clearing the query puts it back rather than opening afresh. */
+    private var browseEntry: VirtualFile? = null
+    private var browseExpansion: Set<VirtualFile> = emptySet()
+    private var browseSelection: VirtualFile? = null
+    private var restoringBrowse = false
+
+    @Volatile
+    private var watchedRoots: List<String> = emptyList()
 
     fun show() {
         buildPanel()
@@ -292,19 +307,38 @@ class NavigatorPopup(private val context: NavigatorContext) {
      * Both panes read the file system once and then sit still, so whatever changes it while they are up has
      * to bring them back in step: a delete run from the context menu, a refactoring that only finishes once
      * the action that started it has returned, or the IDE moving files around on its own.
+     *
+     * Only what the panes are showing counts. A build writing its output, git rewriting its index and the IDE
+     * saving its own settings all land here too, and rebuilding the tree for those is what made folders open
+     * and close while nobody was touching the keyboard.
      */
     private fun watchFileSystem(parent: JBPopup) {
-        val inProject = project.basePath?.let { "$it/" } ?: return
         project.messageBus.connect(parent).subscribe(
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: List<VFileEvent>) {
-                    if (events.any { it !is VFileContentChangeEvent && it.path.startsWith(inProject) }) {
-                        scheduleRefresh()
-                    }
+                    if (events.any { showsWhatChanged(it) }) scheduleFileSystemRefresh()
                 }
             },
         )
+    }
+
+    /** Whether a change is one the panes would draw differently: inside them, and not somewhere they hide. */
+    private fun showsWhatChanged(event: VFileEvent): Boolean {
+        if (event is VFileContentChangeEvent) return false
+        val path = event.path
+        val root = watchedRoots.firstOrNull { path.startsWith(it) } ?: return false
+        val inside = "/" + path.substring(root.length)
+        if (NavigatorSettings.getInstance().hideDotFiles && inside.contains("/.")) return false
+        val file = event.file ?: return true
+        return !file.isValid || !ProjectFileIndex.getInstance(project).isExcluded(file)
+    }
+
+    /** The folders the panes are drawing, read by the file system listener off the thread it arrives on. */
+    private fun rememberWatchedRoots() {
+        val roots = rootList.entries().map { "${it.file.path}/" } +
+            listOfNotNull(zoomStack.lastOrNull()?.dir?.path?.let { "$it/" })
+        watchedRoots = roots.ifEmpty { listOfNotNull(project.basePath?.let { "$it/" }) }
     }
 
     /**
@@ -314,19 +348,35 @@ class NavigatorPopup(private val context: NavigatorContext) {
      */
     private fun closeWhenIdeLosesFocus(parent: JBPopup) = runWhenIdeLosesFocus(parent) { parent.cancel() }
 
-    /** A file system change can land while the popup is on its way out, and its alarm is gone by then. */
-    private fun scheduleRefresh() {
+    private fun scheduleRefresh() = schedule(Refresh.USER, QUERY_DELAY_MS)
+
+    private fun scheduleFileSystemRefresh() = schedule(Refresh.FILE_SYSTEM, FILE_SYSTEM_DELAY_MS)
+
+    /**
+     * A file system change can land while the popup is on its way out, and its alarm is gone by then. A burst
+     * of them must not cancel a keystroke either, so a refresh the user asked for holds the slot.
+     */
+    private fun schedule(reason: Refresh, delay: Int) {
         val activePopup = popup ?: return
         val activeAlarm = alarm ?: return
         if (activePopup.isDisposed || project.isDisposed) return
+        if (reason == Refresh.FILE_SYSTEM && pendingRefresh == Refresh.USER) return
+        pendingRefresh = reason
         activeAlarm.cancelAllRequests()
-        activeAlarm.addRequest({ refresh() }, 50)
+        activeAlarm.addRequest(
+            {
+                pendingRefresh = null
+                refresh(reason)
+            },
+            delay,
+        )
     }
 
     private fun cycleScope(delta: Int) {
         scopeIndex = ((scopeIndex + delta) % scopes.size + scopes.size) % scopes.size
         zoomStack.clear()
         pendingRestore = null
+        forgetBrowseView()
         reopen = true
         setActivePane(Pane.RIGHT)
         refresh()
@@ -395,6 +445,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun zoomIn() {
         val dir = activeSelectedDirectory() ?: return
         zoomStack.addLast(ZoomFrame(dir, rootList.selectedIndex(), treePanel.selectedFile(), activePane))
+        forgetBrowseView()
         reopen = true
         setActivePane(Pane.LEFT)
         refresh()
@@ -402,17 +453,22 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun zoomOut() {
         val frame = zoomStack.removeLastOrNull() ?: return
+        forgetBrowseView()
         pendingRestore = frame
         refresh()
     }
 
-    private fun refresh() {
+    private fun refresh(reason: Refresh = Refresh.USER) {
         dropDeletedZooms()
         val query = searchField.text.trim()
         val scope = scopes[scopeIndex]
         val resolved = ScopeResolver.resolve(scope, context)
-        autoExpand = query.isEmpty()
-        if (query.isEmpty() && searchWasActive) reopen = true
+        autoExpand = query.isEmpty() && reason == Refresh.USER
+        if (query.isNotEmpty() && !searchWasActive) rememberBrowseView()
+        if (query.isEmpty() && searchWasActive) {
+            reopen = true
+            restoringBrowse = browseEntry != null
+        }
         searchWasActive = query.isNotEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
@@ -425,7 +481,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             } else {
                 generation++
                 namedMatches = null
-                showBrowse(resolved)
+                showBrowse(resolved, reason)
             }
             return
         }
@@ -441,7 +497,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
     }
 
-    private fun showBrowse(resolved: ScopeResolver.Resolved) {
+    private fun showBrowse(resolved: ScopeResolver.Resolved, reason: Refresh = Refresh.USER) {
         rootList.clearCounts()
         updateFooter(null)
         treePanel.setEmptyText("No files in scope")
@@ -450,19 +506,29 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val previousFile = treePanel.selectedFile()
         rootList.setEntries(entries)
         val restore = pendingRestore
-        pendingRestore = null
         val current = context.currentFile?.takeIf { it.isValid }
-        val opening = firstOpen || reopen
-        reopen = false
         when {
             restore != null -> {
+                pendingRestore = null
+                reopen = false
                 rootList.selectIndex(restore.leftIndex)
                 rebuildRight()
                 walkOpenTo(restore.rightFile, current)
                 setActivePane(restore.pane)
             }
 
-            opening -> positionOnOpen(entries, current, previous, previousFile)
+            reason == Refresh.FILE_SYSTEM -> keepInPlace(entries, previous, previousFile)
+
+            restoringBrowse -> {
+                restoringBrowse = false
+                reopen = false
+                restoreBrowseView(entries, current, previous, previousFile)
+            }
+
+            firstOpen || reopen -> {
+                reopen = false
+                positionOnOpen(entries, current, previous, previousFile)
+            }
 
             else -> {
                 val kept = previous?.let { p -> entries.firstOrNull { it.file == p.file } }
@@ -476,7 +542,56 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 walkOpenTo(previousFile, current)
             }
         }
-        firstOpen = false
+        if (reason == Refresh.USER) firstOpen = false
+    }
+
+    /** The view a query is about to replace, held so that clearing the query gives it back. */
+    private fun rememberBrowseView() {
+        if (filterMatches != null || namedMatches != null) return
+        browseEntry = rootList.selectedEntry()?.file
+        browseExpansion = treePanel.expandedFiles()
+        browseSelection = treePanel.selectedFile()
+    }
+
+    private fun forgetBrowseView() {
+        browseEntry = null
+        browseExpansion = emptySet()
+        browseSelection = null
+        restoringBrowse = false
+    }
+
+    /**
+     * Clearing a query puts back the folders that were open when it was typed. Opening the tree afresh would
+     * throw away a view the user had shaped, which typing a few letters should not cost.
+     */
+    private fun restoreBrowseView(
+        entries: List<BaseEntry>,
+        current: VirtualFile?,
+        previous: BaseEntry?,
+        previousFile: VirtualFile?,
+    ) {
+        val saved = browseEntry
+        val entry = saved?.let { file -> entries.firstOrNull { it.file == file } }
+        if (entry == null) {
+            positionOnOpen(entries, current, previous, previousFile)
+            return
+        }
+        autoExpand = false
+        rootList.selectEntry(entry)
+        rebuildRight()
+        treePanel.expandFiles(browseExpansion)
+        browseSelection?.takeIf { it.isValid }?.let { treePanel.selectFile(it) }
+    }
+
+    /**
+     * What a change on disk leaves behind: the same entry, the same row and the same folders open. Walking the
+     * tree back open to the file being edited is what an opening does, and a build writing a file is not one.
+     */
+    private fun keepInPlace(entries: List<BaseEntry>, previous: BaseEntry?, previousFile: VirtualFile?) {
+        val kept = previous?.let { p -> entries.firstOrNull { it.file == p.file } }
+        if (kept != null) rootList.selectEntry(kept) else rootList.selectIndex(0)
+        rebuildRight()
+        previousFile?.takeIf { it.isValid }?.let { treePanel.selectFile(it) }
     }
 
     /**
@@ -543,6 +658,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
                 }
             }
         }
+        rememberWatchedRoots()
         refreshPreview()
     }
 
@@ -1103,6 +1219,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private companion object {
         const val FOCUS_RETRY_MS = 150
+        const val QUERY_DELAY_MS = 50
+        const val FILE_SYSTEM_DELAY_MS = 300
 
         /** The two passes of a search run one after the other, so each coalesces against itself alone. */
         const val NAME_PASS = "names"

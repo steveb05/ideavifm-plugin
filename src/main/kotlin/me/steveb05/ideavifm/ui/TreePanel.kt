@@ -376,7 +376,8 @@ class TreePanel(
         model().removeNodeFromParent(node)
     }
 
-    private fun expandedFiles(): Set<VirtualFile> {
+    /** The folders the pane has open, so that a view left for a search can come back the way it was. */
+    fun expandedFiles(): Set<VirtualFile> {
         val files = LinkedHashSet<VirtualFile>()
         for (row in 0 until tree.rowCount) {
             val path = tree.getPathForRow(row) ?: continue
@@ -388,7 +389,7 @@ class TreePanel(
     }
 
     /** Walks the rows as they come into view, since opening one row is what brings the next within reach. */
-    private fun expandFiles(remembered: Set<VirtualFile>) {
+    fun expandFiles(remembered: Set<VirtualFile>) {
         if (remembered.isEmpty()) return
         var row = 0
         while (row < tree.rowCount) {
