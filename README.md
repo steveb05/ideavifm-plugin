@@ -105,7 +105,10 @@ one left behind. What a query finds is shown wherever it sits, whatever these
 settings say, so naming a module or a folder still opens it.
 
 Creating, renaming and deleting show up in both panes as they happen, without
-reopening folders you closed.
+reopening folders you closed. A build or a git command writing under the
+project leaves the view alone: the entry, the row and the open folders stay
+where they are, and only what you press reshapes the tree. Clearing a query
+puts back the folders that were open before you typed it.
 
 ## Search
 
@@ -116,6 +119,10 @@ or a piece after `_`, `-` or `.`). So `docbui` finds
 whose path merely happens to hold a d, an o and a c. Spell a query with a slash
 (`api/usrv`) to match the path literally. A file whose own name matches ranks
 above one reached only through its folders.
+
+File names come up first and what the files declare merges into them a moment
+later, so a query paints as soon as there is something to show. The footer
+counts what is in so far while the search is still running.
 
 A query also matches what a file declares, read from the same index as Go to
 Class and Go to Symbol, so `bob` finds `People.kt` when it declares `Bob`. The

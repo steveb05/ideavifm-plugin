@@ -153,6 +153,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     @Volatile
     private var watchedRoots: List<String> = emptyList()
 
+    @Volatile
+    private var revealedRoots: List<String> = emptyList()
+
     /** The dot folders this view was taken inside, read again whenever the zoom or the current file moves. */
     private var revealed = Revealed.NONE
 
@@ -333,7 +336,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val path = event.path
         val root = watchedRoots.firstOrNull { path.startsWith(it) } ?: return false
         val inside = "/" + path.substring(root.length)
-        if (NavigatorSettings.getInstance().hideDotFiles && inside.contains("/.")) return false
+        val hidesDots = NavigatorSettings.getInstance().hideDotFiles &&
+            revealedRoots.none { path.startsWith(it) }
+        if (hidesDots && inside.contains("/.")) return false
         val file = event.file ?: return true
         return !file.isValid || !ProjectFileIndex.getInstance(project).isExcluded(file)
     }
@@ -343,6 +348,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val roots = rootList.entries().map { "${it.file.path}/" } +
             listOfNotNull(zoomStack.lastOrNull()?.dir?.path?.let { "$it/" })
         watchedRoots = roots.ifEmpty { listOfNotNull(project.basePath?.let { "$it/" }) }
+        revealedRoots = revealed.roots.map { "${it.path}/" }
     }
 
     /**
@@ -471,10 +477,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val resolved = ScopeResolver.resolve(scope, context, revealed)
         autoExpand = query.isEmpty() && reason == Refresh.USER
         if (query.isNotEmpty() && !searchWasActive) rememberBrowseView()
-        if (query.isEmpty() && searchWasActive) {
-            reopen = true
-            restoringBrowse = browseEntry != null
-        }
+        val cleared = query.isEmpty() && searchWasActive
+        if (cleared) reopen = true
         searchWasActive = query.isNotEmpty()
         updateScopeLabel(resolved)
         if (query.isEmpty()) {
@@ -487,6 +491,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             } else {
                 generation++
                 namedMatches = null
+                restoringBrowse = cleared && browseEntry != null
                 showBrowse(resolved, reason)
             }
             return
@@ -738,7 +743,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .expireWith(activePopup)
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { merged ->
                 if (gen != generation) return@finishOnUiThread
-                publish(query, entries, merged, running = false)
+                if (merged.files == named.files) updateFooter(searchNote(merged, running = false))
+                else publish(query, entries, merged, running = false)
             }
             .submit(AppExecutorUtil.getAppExecutorService())
     }
