@@ -121,6 +121,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var openCreated = true
     private var filterMatches: List<RankedFile>? = null
     private var namedMatches: List<RankedFile>? = null
+
+    /** Whether the running search has already picked the entry to look in, and which one it picked. */
+    private var searchLanded = false
+    private var landedOn: VirtualFile? = null
     private var changedOnly = false
 
     /** Cycled inside the popup and reset from the settings the next time it opens, the way [changedOnly] is. */
@@ -159,6 +163,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         closeWhenIdeLosesFocus(created)
         Disposer.register(created) { saveView() }
         setActivePane(Pane.RIGHT)
+        ProjectFileSnapshot.getInstance(project).prepare()
         if (NavigatorSettings.getInstance().restoreLastView) restoreView()
         refresh()
         created.showCenteredInCurrentWindow(project)
@@ -514,9 +519,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val named = namedMatches
         when {
             filter != null -> {
+                val keep = if (searchLanded) treePanel.selectedFile() else null
                 treePanel.showPruned(bucketFor(filter, entry), entry?.file, matchesOnly = searchActive())
                 treePanel.setEmptyText("Nothing found")
-                treePanel.selectBestMatch()
+                if (keep == null || !treePanel.selectFile(keep)) treePanel.selectBestMatch()
             }
 
             named != null -> {
@@ -570,40 +576,107 @@ class NavigatorPopup(private val context: NavigatorContext) {
         }
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
-        val depth = declarationDepth
+        searchLanded = false
+        landedOn = null
         ReadAction.nonBlocking<SearchResult> {
-            val changed = if (changedOnly) changedFileSet() else null
-            val shown = { file: VirtualFile ->
-                !BrowseTree.hiddenByDotRule(project, file) && (changed == null || file in changed)
+            val shown = shownFilter()
+            val named = fileNameSearch.search(query, searchScope) { partial ->
+                publishLater(gen, query, entries, keepShown(partial, shown), running = true)
             }
-            val named = fileNameSearch.search(query, searchScope)
-            NavigatorSearch.merge(
-                SearchResult(named.files.filter { shown(it.file) }, named.truncated),
-                declarationSearch.search(query, searchScope, depth).filterKeys(shown),
-            )
+            keepShown(named, shown)
         }
-            .coalesceBy(this)
+            .coalesceBy(this, NAME_PASS)
             .expireWith(activePopup)
-            .finishOnUiThread(ModalityState.stateForComponent(panel)) { result ->
+            .finishOnUiThread(ModalityState.stateForComponent(panel)) { named ->
                 if (gen != generation) return@finishOnUiThread
-                currentHighlight = QueryHighlight(query, searchBase)
-                filterMatches = result.files
-                val counts = SubtreeMatches.countsFor(result.files, entries) { it.file }
-                rootList.setEntries(entries)
-                rootList.setCounts(counts)
-                OpenTarget.searchLanding(
-                    entries,
-                    counts,
-                    rootList.selectedEntry(),
-                    result.files.firstOrNull()?.file,
-                )?.let { rootList.selectEntry(it) }
-                rebuildRight()
-                updateFooter(
-                    if (result.truncated) "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
-                    else null,
-                )
+                publish(query, entries, named, running = true)
+                runDeclarationSearch(query, gen, entries, searchScope, named, activePopup)
             }
             .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    /**
+     * What a file declares is read from the index and resolved to PSI, which costs more than matching names
+     * does. It runs once the names are on screen and merges into them, so typing never waits on it.
+     */
+    private fun runDeclarationSearch(
+        query: String,
+        gen: Int,
+        entries: List<BaseEntry>,
+        searchScope: GlobalSearchScope,
+        named: SearchResult,
+        activePopup: JBPopup,
+    ) {
+        val depth = declarationDepth
+        ReadAction.nonBlocking<SearchResult> {
+            val shown = shownFilter()
+            NavigatorSearch.merge(named, declarationSearch.search(query, searchScope, depth).filterKeys(shown))
+        }
+            .coalesceBy(this, DECLARATION_PASS)
+            .expireWith(activePopup)
+            .finishOnUiThread(ModalityState.stateForComponent(panel)) { merged ->
+                if (gen != generation) return@finishOnUiThread
+                publish(query, entries, merged, running = false)
+            }
+            .submit(AppExecutorUtil.getAppExecutorService())
+    }
+
+    /** The rows a search may show: the dot rule and the changed files toggle both cut into what it found. */
+    private fun shownFilter(): (VirtualFile) -> Boolean {
+        val changed = if (changedOnly) changedFileSet() else null
+        return { file -> !BrowseTree.hiddenByDotRule(project, file) && (changed == null || file in changed) }
+    }
+
+    private fun keepShown(result: SearchResult, shown: (VirtualFile) -> Boolean): SearchResult =
+        SearchResult(result.files.filter { shown(it.file) }, result.truncated)
+
+    private fun publishLater(
+        gen: Int,
+        query: String,
+        entries: List<BaseEntry>,
+        result: SearchResult,
+        running: Boolean,
+    ) {
+        ApplicationManager.getApplication().invokeLater(
+            {
+                if (gen == generation && popup?.isDisposed == false) publish(query, entries, result, running)
+            },
+            ModalityState.stateForComponent(panel),
+        )
+    }
+
+    private fun publish(query: String, entries: List<BaseEntry>, result: SearchResult, running: Boolean) {
+        currentHighlight = QueryHighlight(query, searchBase)
+        filterMatches = result.files
+        val counts = SubtreeMatches.countsFor(result.files, entries) { it.file }
+        rootList.setEntries(entries)
+        rootList.setCounts(counts)
+        land(entries, counts, result)
+        rebuildRight()
+        updateFooter(searchNote(result, running))
+    }
+
+    /**
+     * A search picks the entry to look in once, on the first rows it has. What comes in afterwards, the
+     * declarations among it, must not pull the left pane out from under a selection the user has moved.
+     */
+    private fun land(entries: List<BaseEntry>, counts: Map<BaseEntry, Int>, result: SearchResult) {
+        if (searchLanded && rootList.selectedEntry()?.file != landedOn) return
+        val target = OpenTarget.searchLanding(
+            entries,
+            counts,
+            rootList.selectedEntry(),
+            result.files.firstOrNull()?.file,
+        ) ?: return
+        rootList.selectEntry(target)
+        searchLanded = true
+        landedOn = target.file
+    }
+
+    private fun searchNote(result: SearchResult, running: Boolean): String? = when {
+        running -> "${result.files.size} matches, searching"
+        result.truncated -> "Showing top ${FileNameSearch.DEFAULT_LIMIT} matches, keep typing to narrow"
+        else -> null
     }
 
     private fun showChangedBrowse(resolved: ScopeResolver.Resolved) {
@@ -1030,5 +1103,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private companion object {
         const val FOCUS_RETRY_MS = 150
+
+        /** The two passes of a search run one after the other, so each coalesces against itself alone. */
+        const val NAME_PASS = "names"
+        const val DECLARATION_PASS = "declarations"
     }
 }

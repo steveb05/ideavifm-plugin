@@ -302,16 +302,18 @@ class TreePanel(
         selectPath(TreePath(target.path))
     }
 
-    fun selectFile(file: VirtualFile) {
+    /** Answers whether the pane holds a row for [file], which is what tells a caller to pick another one. */
+    fun selectFile(file: VirtualFile): Boolean {
         val hiddenRoot = rootNode()
         val enumeration = hiddenRoot.depthFirstEnumeration()
         while (enumeration.hasMoreElements()) {
             val node = enumeration.nextElement() as DefaultMutableTreeNode
             if (nodeData(node)?.file == file) {
                 selectPath(TreePath(node.path))
-                return
+                return true
             }
         }
+        return false
     }
 
     fun locate(file: VirtualFile, base: VirtualFile) {
