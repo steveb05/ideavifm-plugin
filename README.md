@@ -27,7 +27,9 @@ Open it with `Ctrl+Alt+E` (remappable under Settings, Keymap, "IdeaVifm").
 
 Icons come from the IDE's icon providers, so icon packs such as Atom Material
 apply. Dot files are hidden and single child folder chains are compacted by
-default; both toggle off.
+default; both toggle off. A dot folder you are already inside is the exception:
+edit a file under `.github`, or zoom into it, and everything in there shows
+while the other dot folders stay out of the way.
 
 ## Keys
 
@@ -175,7 +177,8 @@ the new file selected and the caret back in the search field.
 
 Settings, Tools, IdeaVifm:
 
-- Hide dot files (default on).
+- Hide dot files (default on). The folder holding the file you are editing is
+  shown whatever this says, so a file under `.github` is never out of reach.
 - Compact single child folder chains (default on).
 - Open a folder holding nothing but files when it is the only one there
   (default on): the tree stops on the packages, but a lone source folder still

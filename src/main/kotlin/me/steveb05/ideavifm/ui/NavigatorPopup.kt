@@ -56,6 +56,7 @@ import me.steveb05.ideavifm.settings.NavigatorViewState
 import me.steveb05.ideavifm.tree.BrowseTree
 import me.steveb05.ideavifm.tree.NamedScopeFiles
 import me.steveb05.ideavifm.tree.NavigatorNodeData
+import me.steveb05.ideavifm.tree.Revealed
 import me.steveb05.ideavifm.tree.SubtreeMatches
 import java.awt.Dimension
 import java.awt.Point
@@ -151,6 +152,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     @Volatile
     private var watchedRoots: List<String> = emptyList()
+
+    /** The dot folders this view was taken inside, read again whenever the zoom or the current file moves. */
+    private var revealed = Revealed.NONE
 
     fun show() {
         buildPanel()
@@ -462,7 +466,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         dropDeletedZooms()
         val query = searchField.text.trim()
         val scope = scopes[scopeIndex]
-        val resolved = ScopeResolver.resolve(scope, context)
+        revealed = Revealed.of(project, zoomStack.lastOrNull()?.dir, context.currentFile)
+        treePanel.setRevealed(revealed)
+        val resolved = ScopeResolver.resolve(scope, context, revealed)
         autoExpand = query.isEmpty() && reason == Refresh.USER
         if (query.isNotEmpty() && !searchWasActive) rememberBrowseView()
         if (query.isEmpty() && searchWasActive) {
@@ -740,7 +746,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
     /** The rows a search may show: the dot rule and the changed files toggle both cut into what it found. */
     private fun shownFilter(): (VirtualFile) -> Boolean {
         val changed = if (changedOnly) changedFileSet() else null
-        return { file -> !BrowseTree.hiddenByDotRule(project, file) && (changed == null || file in changed) }
+        val shownRoots = revealed
+        return { file ->
+            !BrowseTree.hiddenByDotRule(project, file, shownRoots) && (changed == null || file in changed)
+        }
     }
 
     private fun keepShown(result: SearchResult, shown: (VirtualFile) -> Boolean): SearchResult =
@@ -803,8 +812,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
         ReadAction.nonBlocking<List<RankedFile>> {
+            val shownRoots = revealed
             changedFileSet()
-                .filter { searchScope.contains(it) && !BrowseTree.hiddenByDotRule(project, it) }
+                .filter { searchScope.contains(it) && !BrowseTree.hiddenByDotRule(project, it, shownRoots) }
                 .sortedBy { it.path }
                 .map { RankedFile(it, 0) }
         }
@@ -838,9 +848,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
         pendingRestore = null
         ReadAction.nonBlocking<NamedScopeFiles.Result> {
             val changed = if (changedOnly) changedFileSet() else null
+            val shownRoots = revealed
             val raw = NamedScopeFiles.collect(project, named.namedScope)
             NamedScopeFiles.Result(
-                raw.files.filter { !BrowseTree.hiddenByDotRule(project, it) && (changed == null || it in changed) },
+                raw.files.filter {
+                    !BrowseTree.hiddenByDotRule(project, it, shownRoots) && (changed == null || it in changed)
+                },
                 raw.truncated,
             )
         }
@@ -877,7 +890,8 @@ class NavigatorPopup(private val context: NavigatorContext) {
     }
 
     private fun effectiveEntries(resolved: ScopeResolver.Resolved): List<BaseEntry> =
-        zoomStack.lastOrNull()?.let { ScopeResolver.entriesForBase(project, it.dir) } ?: resolved.entries
+        zoomStack.lastOrNull()?.let { ScopeResolver.entriesForBase(project, it.dir, revealed) }
+            ?: resolved.entries
 
     private fun moveLeft(delta: Int) {
         setActivePane(Pane.LEFT)

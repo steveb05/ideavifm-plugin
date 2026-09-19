@@ -15,6 +15,7 @@ import com.intellij.psi.search.scope.packageSet.NamedScope
 import com.intellij.psi.search.scope.packageSet.NamedScopeManager
 import me.steveb05.ideavifm.settings.NavigatorSettings
 import me.steveb05.ideavifm.tree.BrowseTree
+import me.steveb05.ideavifm.tree.Revealed
 import me.steveb05.ideavifm.ui.NavigatorContext
 
 sealed class NavigatorScope(val label: String) {
@@ -44,13 +45,17 @@ object ScopeResolver {
         listOf(NavigatorScope.Project, NavigatorScope.Module, NavigatorScope.Folder) +
             customScopes(context).map { NavigatorScope.Named(it) }
 
-    fun resolve(scope: NavigatorScope, context: NavigatorContext): Resolved = when (scope) {
-        NavigatorScope.Project -> projectResolved(context)
+    fun resolve(
+        scope: NavigatorScope,
+        context: NavigatorContext,
+        revealed: Revealed = Revealed.NONE,
+    ): Resolved = when (scope) {
+        NavigatorScope.Project -> projectResolved(context, revealed)
 
         NavigatorScope.Module -> {
             val module = context.module
             if (module == null) {
-                projectResolved(context).copy(fellBack = true)
+                projectResolved(context, revealed).copy(fellBack = true)
             } else {
                 val all = ModuleManager.getInstance(context.project).modules.toList()
                 val familyNames = moduleFamilyNames(all.map { it.name }, module.name).toSet()
@@ -61,15 +66,19 @@ object ScopeResolver {
                 )
                 val searchScope = family.map { it.moduleContentScope }.reduce { a, b -> a.uniteWith(b) }
                 when {
-                    roots.isEmpty() -> projectResolved(context).copy(fellBack = true)
+                    roots.isEmpty() -> projectResolved(context, revealed).copy(fellBack = true)
                     roots.size == 1 -> Resolved(
-                        entriesForBase(context.project, roots.single()),
+                        entriesForBase(context.project, roots.single(), revealed),
                         searchScope,
                         false,
                     )
 
                     else -> Resolved(
-                        withChildEntries(context.project, withParentHints(roots.map { entryFor(context.project, it) })),
+                        withChildEntries(
+                            context.project,
+                            withParentHints(roots.map { entryFor(context.project, it, revealed) }),
+                            revealed,
+                        ),
                         searchScope,
                         false,
                     )
@@ -79,27 +88,31 @@ object ScopeResolver {
 
         NavigatorScope.Folder -> {
             val dir = context.currentFile?.parent
-            if (dir == null || !dir.isValid) projectResolved(context).copy(fellBack = true)
+            if (dir == null || !dir.isValid) projectResolved(context, revealed).copy(fellBack = true)
             else Resolved(
-                entriesForBase(context.project, dir),
+                entriesForBase(context.project, dir, revealed),
                 GlobalSearchScopesCore.directoryScope(context.project, dir, true),
                 false,
             )
         }
 
-        is NavigatorScope.Named -> projectResolved(context).copy(
+        is NavigatorScope.Named -> projectResolved(context, revealed).copy(
             searchScope = GlobalSearchScopesCore.filterScope(context.project, scope.namedScope),
         )
     }
 
-    fun entryFor(project: Project, dir: VirtualFile): BaseEntry {
-        val (deepest, name) = BrowseTree.compactChain(project, dir)
+    fun entryFor(project: Project, dir: VirtualFile, revealed: Revealed = Revealed.NONE): BaseEntry {
+        val (deepest, name) = BrowseTree.compactChain(project, dir, revealed)
         return BaseEntry(deepest, name, true)
     }
 
-    fun entriesForBase(project: Project, base: VirtualFile): List<BaseEntry> =
-        BrowseTree.visibleChildren(project, base).map { child ->
-            if (child.isDirectory) entryFor(project, child)
+    fun entriesForBase(
+        project: Project,
+        base: VirtualFile,
+        revealed: Revealed = Revealed.NONE,
+    ): List<BaseEntry> =
+        BrowseTree.visibleChildren(project, base, revealed).map { child ->
+            if (child.isDirectory) entryFor(project, child, revealed)
             else BaseEntry(child, child.name, false)
         }
 
@@ -133,20 +146,29 @@ object ScopeResolver {
         else -> withParentHints(sortEntries(listOf(base) + outside))
     }
 
-    fun withChildEntries(project: Project, entries: List<BaseEntry>): List<BaseEntry> {
+    fun withChildEntries(
+        project: Project,
+        entries: List<BaseEntry>,
+        revealed: Revealed = Revealed.NONE,
+    ): List<BaseEntry> {
         val settings = NavigatorSettings.getInstance()
         if (!settings.leftPaneChildren) return entries
         return entries.flatMap { entry ->
             if (!entry.isDirectory) listOf(entry)
-            else listOf(entry) + childEntries(project, entry, settings.leftPaneChildFiles)
+            else listOf(entry) + childEntries(project, entry, settings.leftPaneChildFiles, revealed)
         }
     }
 
-    private fun childEntries(project: Project, parent: BaseEntry, includeFiles: Boolean): List<BaseEntry> =
-        BrowseTree.visibleChildren(project, parent.file)
+    private fun childEntries(
+        project: Project,
+        parent: BaseEntry,
+        includeFiles: Boolean,
+        revealed: Revealed,
+    ): List<BaseEntry> =
+        BrowseTree.visibleChildren(project, parent.file, revealed)
             .filter { it.isDirectory || includeFiles }
             .map { child ->
-                if (child.isDirectory) entryFor(project, child).copy(indent = 1)
+                if (child.isDirectory) entryFor(project, child, revealed).copy(indent = 1)
                 else BaseEntry(child, child.name, false, indent = 1)
             }
 
@@ -157,21 +179,21 @@ object ScopeResolver {
         NamedScopeManager.getInstance(context.project).editableScopes.toList() +
             DependencyValidationManager.getInstance(context.project).editableScopes.toList()
 
-    private fun projectResolved(context: NavigatorContext): Resolved {
+    private fun projectResolved(context: NavigatorContext, revealed: Revealed): Resolved {
         val project = context.project
         val base = project.guessProjectDir()
         val contentRoots = ProjectRootManager.getInstance(project).contentRoots.toList()
         val outside = topLevelRoots(contentRoots, base).map {
-            if (it.isDirectory) entryFor(project, it) else BaseEntry(it, it.name, false)
+            if (it.isDirectory) entryFor(project, it, revealed) else BaseEntry(it, it.name, false)
         }
         val assembled = assembleProjectEntries(
-            base?.let { entryFor(project, it) },
-            base?.let { entriesForBase(project, it) }.orEmpty(),
+            base?.let { entryFor(project, it, revealed) },
+            base?.let { entriesForBase(project, it, revealed) }.orEmpty(),
             outside,
         )
         val entries =
             if (outside.isEmpty() && base != null) assembled
-            else withChildEntries(project, assembled)
+            else withChildEntries(project, assembled, revealed)
         return Resolved(entries, ProjectScope.getContentScope(project), false)
     }
 }

@@ -30,6 +30,7 @@ import me.steveb05.ideavifm.tree.NavigatorNodeData
 import me.steveb05.ideavifm.tree.PrunedMatch
 import me.steveb05.ideavifm.tree.PrunedTreeBuilder
 import me.steveb05.ideavifm.tree.PrunedTreeNode
+import me.steveb05.ideavifm.tree.Revealed
 import me.steveb05.ideavifm.tree.TreeLevel
 
 object PaneBorders {
@@ -55,7 +56,8 @@ class TreePanel(
     enum class CollapseOutcome { COLLAPSED, MOVED_TO_PARENT, AT_TOP_LEVEL }
 
     private val tree = Tree()
-    private val levels = TreeLevels(project, tree)
+    private var revealed = Revealed.NONE
+    private val levels = TreeLevels(project, tree) { revealed }
     private val marked = LinkedHashSet<VirtualFile>()
 
     /** Set while the pane shows what a query found, where the folder rows are scaffolding rather than results. */
@@ -79,7 +81,7 @@ class TreePanel(
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as DefaultMutableTreeNode
-                BrowseTree.loadChildren(project, model(), node)
+                BrowseTree.loadChildren(project, model(), node, revealed)
             }
 
             override fun treeWillCollapse(event: TreeExpansionEvent) = Unit
@@ -118,6 +120,11 @@ class TreePanel(
         tree.repaint()
     }
 
+    /** The dot folders the view was taken inside, which the rows below them are drawn from. */
+    fun setRevealed(revealed: Revealed) {
+        this.revealed = revealed
+    }
+
     fun setEmptyText(text: String) {
         tree.emptyText.text = text
     }
@@ -141,7 +148,7 @@ class TreePanel(
         marked.clear()
         matchesOnly = false
         browseBase = base
-        tree.model = BrowseTree.createSubtreeModel(project, base)
+        tree.model = BrowseTree.createSubtreeModel(project, base, revealed)
         if (tree.rowCount > 0) tree.setSelectionRow(0)
     }
 
@@ -157,7 +164,7 @@ class TreePanel(
         val selected = selectedFile()
         matchesOnly = false
         browseBase = dir
-        tree.model = BrowseTree.createSubtreeModel(project, dir)
+        tree.model = BrowseTree.createSubtreeModel(project, dir, revealed)
         expandFiles(expanded)
         selected?.takeIf { it.isValid }?.let { selectFile(it) }
         if (tree.selectionPath == null && tree.rowCount > 0) tree.setSelectionRow(0)
@@ -321,7 +328,7 @@ class TreePanel(
         val model = model()
         var node = model.root as DefaultMutableTreeNode
         while (nodeData(node)?.file != file) {
-            BrowseTree.loadChildren(project, model, node)
+            BrowseTree.loadChildren(project, model, node, revealed)
             node = node.children().asSequence()
                 .filterIsInstance<DefaultMutableTreeNode>()
                 .firstOrNull { child ->
@@ -338,7 +345,7 @@ class TreePanel(
         val path = tree.selectionPath ?: return
         val node = path.lastPathComponent as DefaultMutableTreeNode
         if (nodeData(node)?.isDirectory != true) return
-        BrowseTree.loadChildren(project, model(), node)
+        BrowseTree.loadChildren(project, model(), node, revealed)
         tree.expandPath(path)
     }
 
@@ -403,7 +410,7 @@ class TreePanel(
         val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
         val file = nodeData(node)?.file ?: return
         if (file !in remembered) return
-        BrowseTree.loadChildren(project, model(), node)
+        BrowseTree.loadChildren(project, model(), node, revealed)
         tree.expandPath(path)
     }
 

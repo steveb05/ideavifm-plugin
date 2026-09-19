@@ -9,13 +9,18 @@ import javax.swing.tree.TreePath
 import me.steveb05.ideavifm.settings.NavigatorSettings
 import me.steveb05.ideavifm.tree.BrowseTree
 import me.steveb05.ideavifm.tree.NavigatorNodeData
+import me.steveb05.ideavifm.tree.Revealed
 import me.steveb05.ideavifm.tree.TreeLevel
 
 /**
  * How far [tree] is open, and walking between the top level folders. Levels are counted the way the tree draws
  * them: a chain of folders shown as one row is one step rather than one per folder it stands for.
  */
-class TreeLevels(private val project: Project, private val tree: Tree) {
+class TreeLevels(
+    private val project: Project,
+    private val tree: Tree,
+    private val revealed: () -> Revealed = { Revealed.NONE },
+) {
 
     fun expandAll() = expandEverythingUnder(root())
 
@@ -36,8 +41,9 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
     fun openTo(level: TreeLevel, from: DefaultMutableTreeNode = root()) {
         when (level) {
             TreeLevel.NONE -> Unit
-            TreeLevel.ONE -> expand(BrowseTree.levelTargets(project, model(), 1, from))
-            TreeLevel.PACKAGES -> expand(BrowseTree.autoExpandTargets(project, model(), from))
+            TreeLevel.ONE -> expand(BrowseTree.levelTargets(project, model(), 1, from, revealed = revealed()))
+            TreeLevel.PACKAGES ->
+                expand(BrowseTree.autoExpandTargets(project, model(), from, revealed = revealed()))
             TreeLevel.ALL -> expandEverythingUnder(from)
         }
     }
@@ -45,7 +51,7 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
     /** Opens every folder one level past the deepest level now open. */
     fun expandOneLevel() {
         for (depth in 1..MAX_LEVELS) {
-            val targets = BrowseTree.levelTargets(project, model(), depth)
+            val targets = BrowseTree.levelTargets(project, model(), depth, revealed = revealed())
             if (targets.any { !tree.isExpanded(TreePath(it.path)) }) {
                 expand(targets)
                 return
@@ -57,7 +63,7 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
     fun collapseOneLevel() {
         val level = currentLevel()
         if (level <= 0) return
-        val keep = BrowseTree.levelTargets(project, model(), level - 1).toSet()
+        val keep = BrowseTree.levelTargets(project, model(), level - 1, revealed = revealed()).toSet()
         for (row in tree.rowCount - 1 downTo 0) {
             val path = tree.getPathForRow(row) ?: continue
             if (!tree.isExpanded(path)) continue
@@ -94,7 +100,7 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
      */
     private fun openJumped(target: DefaultMutableTreeNode, level: TreeLevel) {
         if (level == TreeLevel.NONE) return
-        BrowseTree.loadChildren(project, model(), target)
+        BrowseTree.loadChildren(project, model(), target, revealed())
         tree.expandPath(TreePath(target.path))
         if (level != TreeLevel.ONE) openTo(level, target)
     }
@@ -102,7 +108,7 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
     /** The deepest level the whole tree is open to, which is where the level keys count from. */
     private fun currentLevel(): Int {
         for (depth in 1..MAX_LEVELS) {
-            val targets = BrowseTree.levelTargets(project, model(), depth)
+            val targets = BrowseTree.levelTargets(project, model(), depth, revealed = revealed())
             if (targets.any { !tree.isExpanded(TreePath(it.path)) }) return depth - 1
         }
         return MAX_LEVELS
@@ -119,7 +125,7 @@ class TreeLevels(private val project: Project, private val tree: Tree) {
             val path = tree.getPathForRow(row)
             val node = path?.lastPathComponent as? DefaultMutableTreeNode
             if (node != null && isDirectory(node) && node.isNodeAncestor(from)) {
-                BrowseTree.loadChildren(project, model(), node)
+                BrowseTree.loadChildren(project, model(), node, revealed())
                 tree.expandPath(path)
             }
             row++

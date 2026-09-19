@@ -27,10 +27,14 @@ object BrowseTree {
     private const val CHAIN_CAP = 32
 
 
-    fun createSubtreeModel(project: Project, base: VirtualFile): DefaultTreeModel {
+    fun createSubtreeModel(
+        project: Project,
+        base: VirtualFile,
+        revealed: Revealed = Revealed.NONE,
+    ): DefaultTreeModel {
         val hiddenRoot = DefaultMutableTreeNode(NavigatorNodeData(base, base.name, true))
-        for (child in visibleChildren(project, base)) {
-            if (child.isDirectory) hiddenRoot.add(directoryNode(project, child))
+        for (child in visibleChildren(project, base, revealed)) {
+            if (child.isDirectory) hiddenRoot.add(directoryNode(project, child, revealed))
             else hiddenRoot.add(DefaultMutableTreeNode(NavigatorNodeData(child, child.name, false)))
         }
         return DefaultTreeModel(hiddenRoot)
@@ -40,31 +44,49 @@ object BrowseTree {
         node.childCount != 1 ||
             (node.firstChild as DefaultMutableTreeNode).userObject !== PLACEHOLDER
 
-    fun loadChildren(project: Project, model: DefaultTreeModel, node: DefaultMutableTreeNode) {
+    fun loadChildren(
+        project: Project,
+        model: DefaultTreeModel,
+        node: DefaultMutableTreeNode,
+        revealed: Revealed = Revealed.NONE,
+    ) {
         if (isLoaded(node)) return
         val dir = (node.userObject as NavigatorNodeData).file ?: return
         node.removeAllChildren()
-        for (child in visibleChildren(project, dir)) {
-            if (child.isDirectory) node.add(directoryNode(project, child))
+        for (child in visibleChildren(project, dir, revealed)) {
+            if (child.isDirectory) node.add(directoryNode(project, child, revealed))
             else node.add(DefaultMutableTreeNode(NavigatorNodeData(child, child.name, false)))
         }
         model.nodeStructureChanged(node)
     }
 
     /** A folder that has been deleted holds nothing, and reading children off one throws rather than saying so. */
-    fun visibleChildren(project: Project, dir: VirtualFile): List<VirtualFile> {
+    fun visibleChildren(
+        project: Project,
+        dir: VirtualFile,
+        revealed: Revealed = Revealed.NONE,
+    ): List<VirtualFile> {
         if (!dir.isValid || !dir.isDirectory) return emptyList()
         return ReadAction.compute<List<VirtualFile>, RuntimeException> {
             val index = ProjectFileIndex.getInstance(project)
             val hideDots = NavigatorSettings.getInstance().hideDotFiles
             dir.children
-                .filter { it.isValid && !index.isExcluded(it) && !(hideDots && it.name.startsWith(".")) }
+                .filter { child ->
+                    child.isValid &&
+                        !index.isExcluded(child) &&
+                        !(hideDots && child.name.startsWith(".") && !revealed.covers(child))
+                }
                 .sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
         }
     }
 
-    fun hiddenByDotRule(project: Project, file: VirtualFile): Boolean {
+    fun hiddenByDotRule(
+        project: Project,
+        file: VirtualFile,
+        revealed: Revealed = Revealed.NONE,
+    ): Boolean {
         if (!NavigatorSettings.getInstance().hideDotFiles) return false
+        if (revealed.covers(file)) return false
         val index = ProjectFileIndex.getInstance(project)
         var current: VirtualFile? = file
         var depth = 0
@@ -77,13 +99,18 @@ object BrowseTree {
         return false
     }
 
-    fun compactChain(project: Project, dir: VirtualFile): Pair<VirtualFile, String> {
+    fun compactChain(
+        project: Project,
+        dir: VirtualFile,
+        revealed: Revealed = Revealed.NONE,
+    ): Pair<VirtualFile, String> {
         var deepest = dir
         val names = StringBuilder(dir.name)
         if (!NavigatorSettings.getInstance().compactFolders) return deepest to names.toString()
         var depth = 0
         while (depth < CHAIN_CAP) {
-            val only = visibleChildren(project, deepest).singleOrNull()?.takeIf { it.isDirectory } ?: break
+            val only = visibleChildren(project, deepest, revealed).singleOrNull()?.takeIf { it.isDirectory }
+                ?: break
             deepest = only
             names.append('/').append(only.name)
             depth++
@@ -115,17 +142,18 @@ object BrowseTree {
         maxDepth: Int = 8,
         maxNodes: Int = 200,
         moduleRoots: Set<String> = moduleRootPaths(project),
+        revealed: Revealed = Revealed.NONE,
     ): List<DefaultMutableTreeNode> {
         val openLoneFolder = NavigatorSettings.getInstance().openLoneFolder
         val targets = ArrayList<DefaultMutableTreeNode>()
-        loadChildren(project, model, from)
+        loadChildren(project, model, from, revealed)
         val pending = ArrayDeque<Step>()
         val top = directoryChildren(from)
         top.forEach { pending.addLast(Step(it, 0, alone = top.size == 1)) }
         while (pending.isNotEmpty() && targets.size < maxNodes) {
             val step = pending.removeFirst()
             if (step.depth >= maxDepth) continue
-            loadChildren(project, model, step.node)
+            loadChildren(project, model, step.node, revealed)
             val children = directoryChildren(step.node)
             val scaffolding = children.any { isModuleFolder(it, moduleRoots) }
             if (!scaffolding && isModuleFolder(step.node, moduleRoots)) continue
@@ -196,16 +224,17 @@ object BrowseTree {
         depth: Int,
         from: DefaultMutableTreeNode = model.root as DefaultMutableTreeNode,
         maxNodes: Int = 200,
+        revealed: Revealed = Revealed.NONE,
     ): List<DefaultMutableTreeNode> {
         if (depth <= 0) return emptyList()
         val targets = ArrayList<DefaultMutableTreeNode>()
-        loadChildren(project, model, from)
+        loadChildren(project, model, from, revealed)
         val pending = ArrayDeque<Pair<DefaultMutableTreeNode, Int>>()
         directoryChildren(from).forEach { pending.addLast(it to 1) }
         while (pending.isNotEmpty() && targets.size < maxNodes) {
             val (node, level) = pending.removeFirst()
             if (level > depth) continue
-            loadChildren(project, model, node)
+            loadChildren(project, model, node, revealed)
             targets.add(node)
             val children = directoryChildren(node)
             val childLevel = if (children.size == 1) level else level + 1
@@ -226,8 +255,12 @@ object BrowseTree {
             .any { (it.userObject as? NavigatorNodeData)?.isDirectory == false }
 
 
-    private fun directoryNode(project: Project, dir: VirtualFile): DefaultMutableTreeNode {
-        val (deepest, name) = compactChain(project, dir)
+    private fun directoryNode(
+        project: Project,
+        dir: VirtualFile,
+        revealed: Revealed,
+    ): DefaultMutableTreeNode {
+        val (deepest, name) = compactChain(project, dir, revealed)
         val node = DefaultMutableTreeNode(NavigatorNodeData(deepest, name, true))
         node.add(DefaultMutableTreeNode(PLACEHOLDER))
         return node
