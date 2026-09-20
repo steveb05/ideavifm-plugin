@@ -809,14 +809,16 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val counts = SubtreeMatches.countsFor(result.files, entries) { it.file }
         rootList.setEntries(entries)
         rootList.setCounts(counts)
-        land(entries, counts, result)
+        if (step >= NAMES_STEP) land(entries, counts, result)
         rebuildRight()
         updateFooter(searchNote(result, running))
     }
 
     /**
-     * A search picks the entry to look in once, on the first rows it has. What comes in afterwards, the
-     * declarations among it, must not pull the left pane out from under a selection the user has moved.
+     * A search picks the entry to look in once, and only once it knows what it found. A batch handed over
+     * while the search ran holds whatever it happened to reach first, so landing on one moves the left pane
+     * to another module over a match that the folder being searched had all along. What comes in after the
+     * landing, the declarations among it, must not pull the pane out from under a selection the user moved.
      */
     private fun land(entries: List<BaseEntry>, counts: Map<BaseEntry, Int>, result: SearchResult) {
         if (searchLanded && rootList.selectedEntry()?.file != landedOn) return
