@@ -107,18 +107,18 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
         drainAppended()
         stale = false
         walking = true
-        val reachable = HashMap<VirtualFile, Boolean>()
+        val folders = Folders(project, base, index)
         try {
             index.iterateContent(
                 { file ->
                     ProgressManager.checkCanceled()
                     if (!file.isDirectory) {
                         files.add(file)
-                        paths.add(SearchPath.of(file, base, index))
+                        paths.add(folders.pathOf(file))
                     }
                     true
                 },
-                { file -> isShown(file, reachable) },
+                { file -> folders.isShown(file) },
             )
         } finally {
             walking = false
@@ -129,13 +129,30 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
     }
 
     /**
-     * The folders above a file say as much about it as the file does, and every file in a folder shares that
-     * answer, so the walk works it out once per folder rather than once per file.
+     * What every file in a folder shares: whether the folder is drawn at all, and the path its files hang
+     * off. Working either out per file is what a walk over a large project spends its seconds on, so each is
+     * worked out once and read again for every file beside it.
      */
-    private fun isShown(file: VirtualFile, reachable: MutableMap<VirtualFile, Boolean>): Boolean {
-        if (!BrowseTree.isNavigableItself(project, file)) return false
-        val parent = file.parent ?: return true
-        return reachable.getOrPut(parent) { BrowseTree.isNavigable(project, parent) }
+    private class Folders(
+        private val project: Project,
+        private val base: VirtualFile?,
+        private val index: ProjectFileIndex,
+    ) {
+        private val shown = HashMap<VirtualFile, Boolean>()
+        private val paths = HashMap<VirtualFile, String>()
+
+        fun isShown(file: VirtualFile): Boolean {
+            if (file.isDirectory) return BrowseTree.isNavigable(project, file)
+            val parent = file.parent ?: return BrowseTree.isNavigable(project, file)
+            if (!shown.getOrPut(parent) { BrowseTree.isNavigable(project, parent) }) return false
+            return BrowseTree.isNavigableInsideShownFolder(project, file)
+        }
+
+        fun pathOf(file: VirtualFile): String {
+            val parent = file.parent ?: return SearchPath.of(file, base, index)
+            val prefix = paths.getOrPut(parent) { SearchPath.of(parent, base, index) }
+            return if (prefix.isEmpty()) file.name else "$prefix/${file.name}"
+        }
     }
 
     private fun grow(current: Files, extra: List<Pair<VirtualFile, String>>): Files {

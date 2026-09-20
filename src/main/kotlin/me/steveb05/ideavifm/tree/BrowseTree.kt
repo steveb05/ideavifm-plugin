@@ -2,6 +2,7 @@ package me.steveb05.ideavifm.tree
 
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
@@ -84,6 +85,15 @@ object BrowseTree {
         if (NavigatorSettings.getInstance().showGeneratedFiles) return true
         return !index.isUnderIgnored(file) && !index.isInGeneratedSources(file)
     }
+
+    /**
+     * The rule for a file whose folder has already been cleared. Where a file sits is what decides almost
+     * everything about it, so once the folder is known the only thing left to read is the file's own name,
+     * which spares the walk three index lookups for every file in the project.
+     */
+    fun isNavigableInsideShownFolder(project: Project, file: VirtualFile): Boolean =
+        !FileTypeManager.getInstance().isFileIgnored(file.name) &&
+            !ProjectFileIndex.getInstance(project).isExcluded(file)
 
     /**
      * Whether the walk down the tree reaches [file] at all. Gradle gives a generated folder a content root of

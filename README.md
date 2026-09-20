@@ -126,6 +126,10 @@ whose path merely happens to hold a d, an o and a c. Spell a query with a slash
 (`api/usrv`) to match the path literally. A file whose own name matches ranks
 above one reached only through its folders.
 
+The project is read once, in the background, as soon as the IDE finishes
+indexing, so the first query of the day costs no more than the next one. Open
+the popup before that and it reads the project then instead.
+
 File names come up first and what the files declare merges into them a moment
 later, so a query paints as soon as there is something to show. The footer
 counts what is in so far while the search is still running.

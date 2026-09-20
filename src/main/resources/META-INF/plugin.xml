@@ -22,6 +22,7 @@
                                  instance="me.steveb05.ideavifm.settings.NavigatorConfigurable"
                                  id="me.steveb05.ideavifm.settings"
                                  displayName="IdeaVifm"/>
+        <postStartupActivity implementation="me.steveb05.ideavifm.search.SnapshotWarmup"/>
     </extensions>
     <actions>
         <action id="IdeaVifm.Show"
