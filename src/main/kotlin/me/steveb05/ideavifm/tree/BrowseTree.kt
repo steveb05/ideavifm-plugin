@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VirtualFile
@@ -70,27 +71,35 @@ object BrowseTree {
      * folder as a source root, which re-includes it from under the excluded build folder holding it: the
      * walk down the tree stops at that folder and never reaches the file, so a query must not either.
      */
-    fun isNavigable(project: Project, file: VirtualFile): Boolean {
+    fun isNavigable(project: Project, file: VirtualFile): Boolean =
+        isNavigableItself(project, file) && isReachable(project, file)
+
+    /**
+     * The rule for [file] on its own, leaving the folders above it to [isReachable]. Reading the two apart
+     * lets a walk that has already cleared a folder skip clearing it again for every file inside it.
+     */
+    fun isNavigableItself(project: Project, file: VirtualFile): Boolean {
         val index = ProjectFileIndex.getInstance(project)
         if (index.isExcluded(file)) return false
-        if (!NavigatorSettings.getInstance().showGeneratedFiles &&
-            (index.isUnderIgnored(file) || index.isInGeneratedSources(file))
-        ) {
-            return false
-        }
-        return !underExcludedFolder(index, file)
+        if (NavigatorSettings.getInstance().showGeneratedFiles) return true
+        return !index.isUnderIgnored(file) && !index.isInGeneratedSources(file)
     }
 
-    private fun underExcludedFolder(index: ProjectFileIndex, file: VirtualFile): Boolean {
+    /**
+     * Whether the walk down the tree reaches [file] at all. Gradle gives a generated folder a content root of
+     * its own, so the folders above it are the only thing that says it sits inside an excluded build folder:
+     * the walk has to carry on past a root rather than stop at one.
+     */
+    fun isReachable(project: Project, file: VirtualFile): Boolean {
+        val base = project.guessProjectDir()
         var current = file.parent
         var depth = 0
-        while (current != null && depth < EXCLUDED_WALK_CAP) {
-            if (index.isExcluded(current)) return true
-            if (index.getContentRootForFile(current) == current) return false
+        while (current != null && current != base && depth < EXCLUDED_WALK_CAP) {
+            if (!isNavigableItself(project, current)) return false
             current = current.parent
             depth++
         }
-        return false
+        return true
     }
 
     /** A folder that has been deleted holds nothing, and reading children off one throws rather than saying so. */

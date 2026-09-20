@@ -72,6 +72,24 @@ class ProjectFileSnapshotTest : BasePlatformTestCase() {
         }
     }
 
+    /**
+     * Gradle gives a generated folder a content root of its own, which ends the walk up before it reaches the
+     * excluded build folder above it. Reachability is what decides, so the walk has to carry on past a root.
+     */
+    fun testAContentRootInsideAnExcludedFolderIsNotSearched() {
+        myFixture.addFileToProject("build-logic/build/generated-sources/dsl/kotlin/Accessor.kt", "")
+        val build = myFixture.findFileInTempDir("build-logic/build")
+        val generated = myFixture.findFileInTempDir("build-logic/build/generated-sources/dsl/kotlin")
+        PsiTestUtil.addExcludedRoot(myFixture.module, build)
+        PsiTestUtil.addContentRoot(myFixture.module, generated)
+        try {
+            assertFalse(names("accessor").toString(), names("accessor").contains("Accessor.kt"))
+        } finally {
+            PsiTestUtil.removeContentEntry(myFixture.module, generated)
+            PsiTestUtil.removeExcludedRoot(myFixture.module, build)
+        }
+    }
+
     fun testExcludedFoldersAreNotSearched() {
         myFixture.addFileToProject("out/Stale.kt", "")
         val excluded = myFixture.findFileInTempDir("out")

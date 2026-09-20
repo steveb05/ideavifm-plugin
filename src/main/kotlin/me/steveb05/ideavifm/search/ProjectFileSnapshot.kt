@@ -107,6 +107,7 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
         drainAppended()
         stale = false
         walking = true
+        val reachable = HashMap<VirtualFile, Boolean>()
         try {
             index.iterateContent(
                 { file ->
@@ -117,7 +118,7 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
                     }
                     true
                 },
-                { file -> BrowseTree.isNavigable(project, file) },
+                { file -> isShown(file, reachable) },
             )
         } finally {
             walking = false
@@ -125,6 +126,16 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
         val built = Files(files.toTypedArray(), paths.toTypedArray())
         held = built
         return built
+    }
+
+    /**
+     * The folders above a file say as much about it as the file does, and every file in a folder shares that
+     * answer, so the walk works it out once per folder rather than once per file.
+     */
+    private fun isShown(file: VirtualFile, reachable: MutableMap<VirtualFile, Boolean>): Boolean {
+        if (!BrowseTree.isNavigableItself(project, file)) return false
+        val parent = file.parent ?: return true
+        return reachable.getOrPut(parent) { BrowseTree.isNavigable(project, parent) }
     }
 
     private fun grow(current: Files, extra: List<Pair<VirtualFile, String>>): Files {
