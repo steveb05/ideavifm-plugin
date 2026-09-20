@@ -19,9 +19,10 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import com.intellij.util.concurrency.AppExecutorUtil
+import me.steveb05.ideavifm.tree.BrowseTree
 
 /**
- * Every file in the project's content beside the path a query is matched against, so that a keystroke matches
+ * Every file the navigator draws beside the path a query is matched against, so that a keystroke matches
  * an array already in memory. Reading the file system again for each letter typed is what made a search on a
  * large project take seconds: the walk itself, a relative path built per file and a matcher built per file,
  * all repeated from the first letter on.
@@ -102,14 +103,17 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
         stale = false
         walking = true
         try {
-            index.iterateContent { file ->
-                ProgressManager.checkCanceled()
-                if (!file.isDirectory) {
-                    files.add(file)
-                    paths.add(SearchPath.of(file, base, index))
-                }
-                true
-            }
+            index.iterateContent(
+                { file ->
+                    ProgressManager.checkCanceled()
+                    if (!file.isDirectory) {
+                        files.add(file)
+                        paths.add(SearchPath.of(file, base, index))
+                    }
+                    true
+                },
+                { file -> BrowseTree.isNavigable(project, file) },
+            )
         } finally {
             walking = false
         }
@@ -153,6 +157,7 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
     private fun append(file: VirtualFile?) {
         if (file == null || file.isDirectory || !file.isValid) return
         if (!ProjectFileIndex.getInstance(project).isInContent(file)) return
+        if (!BrowseTree.isNavigable(project, file)) return
         synchronized(appended) {
             if (appended.size >= MAX_APPENDED) {
                 appended.clear()

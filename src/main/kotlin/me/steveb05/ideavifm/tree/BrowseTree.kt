@@ -60,6 +60,16 @@ object BrowseTree {
         model.nodeStructureChanged(node)
     }
 
+    /**
+     * Whether the navigator draws [file] at all. Build output, generated code and what the IDE is set to
+     * ignore are not places a person navigates to. A generated source root has to be named on its own: the
+     * build tool registers it as content, so being inside an excluded build folder does not hide it.
+     */
+    fun isNavigable(project: Project, file: VirtualFile): Boolean {
+        val index = ProjectFileIndex.getInstance(project)
+        return !index.isExcluded(file) && !index.isUnderIgnored(file) && !index.isInGeneratedSources(file)
+    }
+
     /** A folder that has been deleted holds nothing, and reading children off one throws rather than saying so. */
     fun visibleChildren(
         project: Project,
@@ -68,12 +78,11 @@ object BrowseTree {
     ): List<VirtualFile> {
         if (!dir.isValid || !dir.isDirectory) return emptyList()
         return ReadAction.compute<List<VirtualFile>, RuntimeException> {
-            val index = ProjectFileIndex.getInstance(project)
             val hideDots = NavigatorSettings.getInstance().hideDotFiles
             dir.children
                 .filter { child ->
                     child.isValid &&
-                        !index.isExcluded(child) &&
+                        isNavigable(project, child) &&
                         !(hideDots && child.name.startsWith(".") && !revealed.covers(child))
                 }
                 .sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))

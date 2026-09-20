@@ -25,6 +25,10 @@ Open it with `Ctrl+Alt+E` (remappable under Settings, Keymap, "IdeaVifm").
   to the IDE's own actions, so refactorings and safe delete behave as they do
   in the project view.
 
+Build output, generated code and the files the IDE is set to ignore are left
+out of both panes and out of every query, so a `build/generated-sources` tree
+never turns up among the results.
+
 Icons come from the IDE's icon providers, so icon packs such as Atom Material
 apply. Dot files are hidden and single child folder chains are compacted by
 default; both toggle off. A dot folder you are already inside is the exception:
