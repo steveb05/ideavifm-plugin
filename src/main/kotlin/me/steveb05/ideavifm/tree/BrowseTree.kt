@@ -25,6 +25,7 @@ object BrowseTree {
     private val PLACEHOLDER = NavigatorNodeData(null, "loading", false)
     private const val DOT_WALK_CAP = 32
     private const val CHAIN_CAP = 32
+    private const val EXCLUDED_WALK_CAP = 64
 
 
     fun createSubtreeModel(
@@ -63,14 +64,33 @@ object BrowseTree {
     /**
      * Whether the navigator draws [file] at all. Build output, generated code and what the IDE is set to
      * ignore are not places a person navigates to, until they say otherwise. A generated source root has to
-     * be named on its own: the build tool registers it as content, so being inside an excluded build folder
-     * does not hide it.
+     * be named on its own, since the build tool registers it as content of the module.
+     *
+     * The folders above it count as much as the file does. An included build registers its own generated
+     * folder as a source root, which re-includes it from under the excluded build folder holding it: the
+     * walk down the tree stops at that folder and never reaches the file, so a query must not either.
      */
     fun isNavigable(project: Project, file: VirtualFile): Boolean {
         val index = ProjectFileIndex.getInstance(project)
         if (index.isExcluded(file)) return false
-        if (NavigatorSettings.getInstance().showGeneratedFiles) return true
-        return !index.isUnderIgnored(file) && !index.isInGeneratedSources(file)
+        if (!NavigatorSettings.getInstance().showGeneratedFiles &&
+            (index.isUnderIgnored(file) || index.isInGeneratedSources(file))
+        ) {
+            return false
+        }
+        return !underExcludedFolder(index, file)
+    }
+
+    private fun underExcludedFolder(index: ProjectFileIndex, file: VirtualFile): Boolean {
+        var current = file.parent
+        var depth = 0
+        while (current != null && depth < EXCLUDED_WALK_CAP) {
+            if (index.isExcluded(current)) return true
+            if (index.getContentRootForFile(current) == current) return false
+            current = current.parent
+            depth++
+        }
+        return false
     }
 
     /** A folder that has been deleted holds nothing, and reading children off one throws rather than saying so. */

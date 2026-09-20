@@ -53,6 +53,25 @@ class ProjectFileSnapshotTest : BasePlatformTestCase() {
         }
     }
 
+    /**
+     * An included build registers its own generated folder as a plain source root, which re-includes it from
+     * under the excluded build folder holding it. No pane can reach it, since the walk down stops at that
+     * folder, so no query may reach it either.
+     */
+    fun testASourceRootInsideAnExcludedFolderIsNotSearched() {
+        myFixture.addFileToProject("build-logic/build/generated-sources/Accessors.kt", "")
+        val build = myFixture.findFileInTempDir("build-logic/build")
+        val generated = myFixture.findFileInTempDir("build-logic/build/generated-sources")
+        PsiTestUtil.addExcludedRoot(myFixture.module, build)
+        PsiTestUtil.addSourceRoot(myFixture.module, generated)
+        try {
+            assertFalse(names("accessors").toString(), names("accessors").contains("Accessors.kt"))
+        } finally {
+            PsiTestUtil.removeSourceRoot(myFixture.module, generated)
+            PsiTestUtil.removeExcludedRoot(myFixture.module, build)
+        }
+    }
+
     fun testExcludedFoldersAreNotSearched() {
         myFixture.addFileToProject("out/Stale.kt", "")
         val excluded = myFixture.findFileInTempDir("out")
