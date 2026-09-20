@@ -71,6 +71,11 @@ class ProjectFileSnapshot(private val project: Project) : Disposable {
     /** Whether a search can run without reading the whole project first. */
     fun isReady(): Boolean = held != null && !stale
 
+    /** What the walk leaves out is a setting, so changing it makes the next search read the project again. */
+    fun invalidate() {
+        stale = true
+    }
+
     /** Reads the project ahead of the first keystroke, so that typing never waits for the walk. */
     fun prepare() {
         if (isReady()) return

@@ -27,7 +27,8 @@ Open it with `Ctrl+Alt+E` (remappable under Settings, Keymap, "IdeaVifm").
 
 Build output, generated code and the files the IDE is set to ignore are left
 out of both panes and out of every query, so a `build/generated-sources` tree
-never turns up among the results.
+never turns up among the results. `Ctrl+Shift+Period` shows them again, the way
+`Ctrl+Period` does for dot files.
 
 Icons come from the IDE's icon providers, so icon packs such as Atom Material
 apply. Dot files are hidden and single child folder chains are compacted by
@@ -50,6 +51,7 @@ while the other dot folders stay out of the way.
 | `Backspace` (empty query) | Zoom out |
 | `Alt+P` | Toggle the preview pane |
 | `Ctrl+Period` | Toggle dot files |
+| `Ctrl+Shift+Period` | Toggle generated code and ignored files |
 | `Alt+C` | Toggle changed files only |
 | `Alt+S` | Cycle what a query matches inside a file: classes, top level declarations, all symbols |
 | `Ctrl+F` | Return the caret to the search field |
@@ -188,6 +190,8 @@ the new file selected and the caret back in the search field.
 
 Settings, Tools, IdeaVifm:
 
+- Show generated code and ignored files (default off), which `Ctrl+Shift+Period`
+  turns on for the popup you have open.
 - Hide dot files (default on). The folder holding the file you are editing is
   shown whatever this says, so a file under `.github` is never out of reach.
 - Compact single child folder chains (default on).

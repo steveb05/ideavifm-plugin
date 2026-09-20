@@ -15,6 +15,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiUtilCore
 import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
+import me.steveb05.ideavifm.tree.BrowseTree
 
 /**
  * How much of what a file declares a query is matched against.
@@ -38,6 +39,9 @@ enum class DeclarationDepth(val label: String) {
  * inside it, and Strings.kt when bobcase is a function inside it. The names come from the contributors behind
  * Go to Class and Go to Symbol, one per language, which read them from the index: no file is opened and no PSI
  * is built until a name matches.
+ *
+ * The index holds generated code as readily as written code, so a declaration in build/generated-sources comes
+ * back from it although no pane would draw the file. What the navigator does not show, it does not offer.
  */
 class DeclarationSearch(private val project: Project) {
 
@@ -166,6 +170,7 @@ class DeclarationSearch(private val project: Project) {
         if (topLevelOnly && element.parent !is PsiFile) return null
         val file = PsiUtilCore.getVirtualFile(element) ?: return null
         if (!file.isValid || file.isDirectory || !scope.contains(file)) return null
+        if (!BrowseTree.isNavigable(project, file)) return null
         return file to Declaration(name, element.textOffset, weight)
     }
 

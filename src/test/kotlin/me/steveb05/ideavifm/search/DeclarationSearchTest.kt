@@ -5,7 +5,11 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.psi.search.ProjectScope
 import com.intellij.testFramework.DumbModeTestUtils
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import me.steveb05.ideavifm.settings.NavigatorSettings
+import org.jetbrains.jps.model.java.JavaSourceRootType
+import org.jetbrains.jps.model.java.JpsJavaExtensionService
 
 /**
  * The point of the whole feature: a class the user can name lives in a file whose name they cannot. These run
@@ -63,6 +67,39 @@ class DeclarationSearchTest : BasePlatformTestCase() {
             assertTrue(declaring("bob").isEmpty())
         }
         assertEquals(listOf("Bob", "Bobby"), declaring("bob")[people]?.map { it.name })
+    }
+
+    /**
+     * The index holds generated code as readily as written code, so the rule that keeps it out of the panes
+     * has to reach this search too, or a query would offer a file no pane would ever draw.
+     */
+    fun testGeneratedCodeIsNotOffered() {
+        val generated = myFixture.addFileToProject(
+            "build/generated-sources/Bobs.kt",
+            "package generated\n\nclass BobGenerated\n",
+        ).virtualFile
+        val root = myFixture.findFileInTempDir("build/generated-sources")
+        val properties = JpsJavaExtensionService.getInstance().createSourceRootProperties("", true)
+        PsiTestUtil.addSourceRoot(myFixture.module, root, JavaSourceRootType.SOURCE, properties)
+        try {
+            assertNull(declaring("bobgen")[generated])
+            withGeneratedShown {
+                assertEquals(listOf("BobGenerated"), declaring("bobgen")[generated]?.map { it.name })
+            }
+        } finally {
+            PsiTestUtil.removeSourceRoot(myFixture.module, root)
+        }
+    }
+
+    private fun withGeneratedShown(block: () -> Unit) {
+        val settings = NavigatorSettings.getInstance()
+        val before = settings.showGeneratedFiles
+        settings.showGeneratedFiles = true
+        try {
+            block()
+        } finally {
+            settings.showGeneratedFiles = before
+        }
     }
 
     fun testAClassNameReachesTheFileThatDeclaresIt() {

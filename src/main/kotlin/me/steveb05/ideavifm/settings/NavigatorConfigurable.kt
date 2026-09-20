@@ -24,6 +24,14 @@ class NavigatorConfigurable : BoundConfigurable("IdeaVifm") {
             checkBox("Hide dot files and folders").bindSelected(settings::hideDotFiles)
         }
         row {
+            checkBox("Show generated code and ignored files")
+                .bindSelected(settings::showGeneratedFiles)
+                .comment(
+                    "Off: what a build tool generates, build/generated-sources among it, stays out of both " +
+                        "panes and out of every query. Ctrl+Shift+Period turns it back on for a moment.",
+                )
+        }
+        row {
             checkBox("Compact single child folder chains").bindSelected(settings::compactFolders)
         }
         row("How far the tree opens:") {

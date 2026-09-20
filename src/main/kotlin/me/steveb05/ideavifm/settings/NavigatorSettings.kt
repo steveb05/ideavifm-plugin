@@ -14,6 +14,7 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
 
     data class State(
         var hideDotFiles: Boolean = true,
+        var showGeneratedFiles: Boolean = false,
         var compactFolders: Boolean = true,
         var openLoneFolder: Boolean = true,
         var treeOpenLevel: TreeLevel = TreeLevel.PACKAGES,
@@ -41,6 +42,12 @@ class NavigatorSettings : PersistentStateComponent<NavigatorSettings.State> {
         get() = current.hideDotFiles
         set(value) {
             current.hideDotFiles = value
+        }
+
+    var showGeneratedFiles: Boolean
+        get() = current.showGeneratedFiles
+        set(value) {
+            current.showGeneratedFiles = value
         }
 
     var compactFolders: Boolean

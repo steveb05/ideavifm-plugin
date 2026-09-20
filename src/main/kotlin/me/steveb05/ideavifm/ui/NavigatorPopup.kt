@@ -259,6 +259,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         ) { zoomOut() }
         commands.bind(NavigatorCommand.TOGGLE_PREVIEW) { togglePreview() }
         commands.bind(NavigatorCommand.TOGGLE_DOT_FILES) { toggleDotFiles() }
+        commands.bind(NavigatorCommand.TOGGLE_GENERATED) { toggleGeneratedFiles() }
         commands.bind(NavigatorCommand.TOGGLE_CHANGED) { toggleChangedOnly() }
         commands.bind(NavigatorCommand.CYCLE_DECLARATIONS) { cycleDeclarationDepth() }
         commands.bind(NavigatorCommand.NEW_ELEMENT) { showNewElement(inverted = false) }
@@ -755,12 +756,17 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .submit(AppExecutorUtil.getAppExecutorService())
     }
 
-    /** The rows a search may show: the dot rule and the changed files toggle both cut into what it found. */
+    /**
+     * The rows a search may show. Build output and generated code are not the navigator's to offer whichever
+     * index turned them up, and the dot rule and the changed files toggle cut further into what is left.
+     */
     private fun shownFilter(): (VirtualFile) -> Boolean {
         val changed = if (changedOnly) changedFileSet() else null
         val shownRoots = revealed
         return { file ->
-            !BrowseTree.hiddenByDotRule(project, file, shownRoots) && (changed == null || file in changed)
+            BrowseTree.isNavigable(project, file) &&
+                !BrowseTree.hiddenByDotRule(project, file, shownRoots) &&
+                (changed == null || file in changed)
         }
     }
 
@@ -839,9 +845,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val entries = effectiveEntries(resolved)
         val searchScope = zoomedSearchScope(resolved)
         ReadAction.nonBlocking<List<RankedFile>> {
-            val shownRoots = revealed
+            val shown = shownFilter()
             changedFileSet()
-                .filter { searchScope.contains(it) && !BrowseTree.hiddenByDotRule(project, it, shownRoots) }
+                .filter { searchScope.contains(it) && shown(it) }
                 .sortedBy { it.path }
                 .map { RankedFile(it, 0) }
         }
@@ -874,13 +880,10 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val gen = ++generation
         pendingRestore = null
         ReadAction.nonBlocking<NamedScopeFiles.Result> {
-            val changed = if (changedOnly) changedFileSet() else null
-            val shownRoots = revealed
+            val shown = shownFilter()
             val raw = NamedScopeFiles.collect(project, named.namedScope)
             NamedScopeFiles.Result(
-                raw.files.filter {
-                    !BrowseTree.hiddenByDotRule(project, it, shownRoots) && (changed == null || it in changed)
-                },
+                raw.files.filter { shown(it) },
                 raw.truncated,
             )
         }
@@ -947,6 +950,18 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private fun toggleDotFiles() {
         val settings = NavigatorSettings.getInstance()
         settings.hideDotFiles = !settings.hideDotFiles
+        refresh()
+    }
+
+    /**
+     * Generated code sits in the index the way written code does, so showing it again has to reach the walk
+     * the search reads from as well as the panes.
+     */
+    private fun toggleGeneratedFiles() {
+        val settings = NavigatorSettings.getInstance()
+        settings.showGeneratedFiles = !settings.showGeneratedFiles
+        ProjectFileSnapshot.getInstance(project).invalidate()
+        updateFooter()
         refresh()
     }
 
@@ -1252,6 +1267,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val notes = listOfNotNull(
             if (markCount > 0) "$markCount marked" else null,
             if (changedOnly) "Changed files only" else null,
+            if (NavigatorSettings.getInstance().showGeneratedFiles) "Generated files" else null,
             declarationDepth.takeIf { it != NavigatorSettings.getInstance().declarationDepth }?.label,
             extra,
         )
