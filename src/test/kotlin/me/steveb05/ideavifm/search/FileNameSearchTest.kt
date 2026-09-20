@@ -50,6 +50,18 @@ class FileNameSearchTest : BasePlatformTestCase() {
         assertEquals(listOf("userService.ts"), names)
     }
 
+    /**
+     * A name the query names outright must come back whatever else the query reaches. Matching the path in
+     * chunks turns up a great many files for a word like this, and none of them may crowd out the file itself.
+     */
+    fun testAWordThatNamesAFileFindsItAmongEverythingElseItReaches() {
+        myFixture.addFileToProject("app/build.gradle.kts", "")
+        myFixture.addFileToProject("gradle/wrapper/gradle-wrapper.properties", "")
+        val paths = paths("gradle")
+        assertTrue(paths.toString(), paths.contains("app/build.gradle.kts"))
+        assertTrue(paths.toString(), paths.contains("extensions/_DocsExtension/build.gradle.kts"))
+    }
+
     fun testQuerySpansFolderAndFileName() {
         val paths = paths("docbui")
         assertEquals(listOf("extensions/_DocsExtension/build.gradle.kts"), paths)

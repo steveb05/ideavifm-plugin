@@ -60,6 +60,7 @@ import me.steveb05.ideavifm.tree.Revealed
 import me.steveb05.ideavifm.tree.SubtreeMatches
 import java.awt.Dimension
 import java.awt.Point
+import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.Box
 import javax.swing.JComponent
 import javax.swing.event.DocumentEvent
@@ -126,6 +127,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
     private var openCreated = true
     private var filterMatches: List<RankedFile>? = null
     private var namedMatches: List<RankedFile>? = null
+
+    /** How far along the rows now on screen are, so that a batch from further back cannot replace them. */
+    private var publishedStep = 0
 
     /** Whether the running search has already picked the entry to look in, and which one it picked. */
     private var searchLanded = false
@@ -705,10 +709,12 @@ class NavigatorPopup(private val context: NavigatorContext) {
         val searchScope = zoomedSearchScope(resolved)
         searchLanded = false
         landedOn = null
+        publishedStep = 0
+        val step = AtomicInteger(0)
         ReadAction.nonBlocking<SearchResult> {
             val shown = shownFilter()
             val named = fileNameSearch.search(query, searchScope) { partial ->
-                publishLater(gen, query, entries, keepShown(partial, shown), running = true)
+                publishLater(gen, step.incrementAndGet(), query, entries, keepShown(partial, shown))
             }
             keepShown(named, shown)
         }
@@ -716,7 +722,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .expireWith(activePopup)
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { named ->
                 if (gen != generation) return@finishOnUiThread
-                publish(query, entries, named, running = true)
+                publish(NAMES_STEP, query, entries, named, running = true)
                 runDeclarationSearch(query, gen, entries, searchScope, named, activePopup)
             }
             .submit(AppExecutorUtil.getAppExecutorService())
@@ -744,7 +750,7 @@ class NavigatorPopup(private val context: NavigatorContext) {
             .finishOnUiThread(ModalityState.stateForComponent(panel)) { merged ->
                 if (gen != generation) return@finishOnUiThread
                 if (merged.files == named.files) updateFooter(searchNote(merged, running = false))
-                else publish(query, entries, merged, running = false)
+                else publish(MERGED_STEP, query, entries, merged, running = false)
             }
             .submit(AppExecutorUtil.getAppExecutorService())
     }
@@ -763,20 +769,35 @@ class NavigatorPopup(private val context: NavigatorContext) {
 
     private fun publishLater(
         gen: Int,
+        step: Int,
         query: String,
         entries: List<BaseEntry>,
         result: SearchResult,
-        running: Boolean,
     ) {
         ApplicationManager.getApplication().invokeLater(
             {
-                if (gen == generation && popup?.isDisposed == false) publish(query, entries, result, running)
+                if (gen == generation && popup?.isDisposed == false) {
+                    publish(step, query, entries, result, running = true)
+                }
             },
             ModalityState.stateForComponent(panel),
         )
     }
 
-    private fun publish(query: String, entries: List<BaseEntry>, result: SearchResult, running: Boolean) {
+    /**
+     * Rows reach the panes out of order: a batch handed over while the search ran is posted to this thread on
+     * its own, and the finished result can arrive first. Each batch says how far along it is, and one from
+     * further back is dropped rather than allowed to hide files the finished result had already shown.
+     */
+    private fun publish(
+        step: Int,
+        query: String,
+        entries: List<BaseEntry>,
+        result: SearchResult,
+        running: Boolean,
+    ) {
+        if (step < publishedStep) return
+        publishedStep = step
         currentHighlight = QueryHighlight(query, searchBase)
         filterMatches = result.files
         val counts = SubtreeMatches.countsFor(result.files, entries) { it.file }
@@ -1245,5 +1266,9 @@ class NavigatorPopup(private val context: NavigatorContext) {
         /** The two passes of a search run one after the other, so each coalesces against itself alone. */
         const val NAME_PASS = "names"
         const val DECLARATION_PASS = "declarations"
+
+        /** Past every batch a running search hands over, so a late one never replaces a finished result. */
+        const val NAMES_STEP = Int.MAX_VALUE - 1
+        const val MERGED_STEP = Int.MAX_VALUE
     }
 }
